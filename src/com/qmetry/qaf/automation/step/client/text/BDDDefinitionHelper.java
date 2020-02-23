@@ -1,35 +1,38 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.step.client.text;
 
 import static com.qmetry.qaf.automation.core.ConfigurationManager.getBundle;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.text.StrLookup;
+import org.apache.commons.lang.text.StrSubstitutor;
+
+import com.qmetry.qaf.automation.util.JSONUtil;
 import com.qmetry.qaf.automation.util.StringMatcher;
 import com.qmetry.qaf.automation.util.StringUtil;
 
@@ -158,7 +161,9 @@ public class BDDDefinitionHelper {
 		}
 
 		public static String getParamDefRegx() {
-			return "\\{([^\\}]).*?}";
+			//return "\\{([^\\}]).*?}";
+			//#320
+			return "(?<!\\\\)\\{([^\\}]).*?}";
 		}
 	}
 
@@ -181,6 +186,58 @@ public class BDDDefinitionHelper {
 		return resultString;
 	}
 
+	/**
+	 * This method will convert gherkin parameter to qaf parameter.
+	 * Examples:<br/>
+	 *  <code>
+	 * 	a "&lt;param.a1>" and &lt;another> p&lt;a>ra${meter} and \&lt;param.a2> again
+	 * </code>
+	 *  <br/>will be converted to :<br/>
+	 *  <code>
+	 *  a "${param.a1}" and ${another} p${a}ra${meter} and &lt;param.a2> again
+	 *  </code><br/><br/>
+	 * <code>
+	 * 	a "&lt;param.a1>" and &lt;another> p&lt;a>ra${meter} and \\&lt;\&lt;param.a2> again
+	 * </code>
+	 *  <br/>will be converted to :<br/>
+	 *  <code>
+	 *  a "${param.a1}" and ${another} p${a}ra${meter} and \&lt;&lt;param.a2> again
+	 *  </code>
+	 * @param s
+	 * @return
+	 */
+	public static String convertPrameter(String s) {
+		String paramPattern = "(?<!\\\\)<([^>]).*?>";
+		Matcher m = Pattern.compile(paramPattern).matcher(s);
+		while (m.find()) {
+			String param = m.group();
+			String newParam = param.replace("<", "${").replace(">", "}");
+			s = s.replace(param, newParam);
+		}
+		return s.replace("\\<", "<");
+	}
+
+	public static String replaceParams(String stepCall, Map<String, Object> context) {
+		stepCall = convertPrameter(stepCall);
+		//don't resolve quoted parameters.
+		stepCall = stepCall.replace("\"${", "\"<%{");
+		//qaf#321 
+		StrLookup lookup = new StrLookup() {
+			public String lookup(String var) {
+
+				Object prop = context.get(var);
+				if(prop==null) {
+					prop = getBundle().getSubstitutor().getVariableResolver().lookup(var);
+				}
+				return (prop != null) ? JSONUtil.toString(prop) : null;
+			}
+		};		
+		StrSubstitutor interpol = new StrSubstitutor(lookup);
+		stepCall = interpol.replace(stepCall);
+		
+		stepCall = stepCall.replace( "\"<%{","\"${");
+		return stepCall;
+	}
 	public static List<String[]> getArgs(String call, String def, List<String> argsInDef) {
 
 		List<String[]> rlst = new ArrayList<String[]>();
@@ -199,7 +256,7 @@ public class BDDDefinitionHelper {
 
 			String nextGroup = i == argsInDef.size() - 1 ? wcopy
 					: wcopy.substring(0, wcopy.indexOf(argsInDef.get(i + 1)));
-			nextGroup = getFirstMatch(nextGroup, call);
+			nextGroup = getFirstMatch(Pattern.quote(nextGroup), call);
 			String temp = getFirstMatch(ParamType.getParamValueRegx() + nextGroup, call);
 			temp = temp.replaceAll(nextGroup, "");
 
@@ -226,7 +283,7 @@ public class BDDDefinitionHelper {
 	public static List<String[]> getArgsFromCall(String def, String call,List<String> defArgPos) {
 		List<String[]> argsToreturn = new ArrayList<String[]>();
 		List<String[]> args = getArgs(call, def, defArgPos);
-
+		
 		Pattern num = Pattern.compile(ParamType.LONG.getRegx());
 
 		argsToreturn.addAll(args);
@@ -236,7 +293,7 @@ public class BDDDefinitionHelper {
 			def = def.replace(posInDef, Pattern.quote(args.get(i)[0]));
 
 			Matcher numMathcher = num.matcher(posInDef);
-			int argPos = numMathcher.find() ? Integer.parseInt(numMathcher.group()) : i;
+			int argPos = Character.isDigit(posInDef.charAt(1))&&numMathcher.find() ? Integer.parseInt(numMathcher.group()) : i;
 			args.get(i)[0] = processArg(args.get(i)[0]);
 			argsToreturn.set(argPos, args.get(i));
 		}
@@ -247,12 +304,11 @@ public class BDDDefinitionHelper {
 	public static boolean matches(String def, String call) {
 		String origDef = def;
 		def = def.replaceAll(ParamType.getParamDefRegx(), ParamType.getParamValueRegx().replaceAll("\\\\", "\\\\\\\\"));
-		// System.out.println(def);
 		if (!StringMatcher.likeIgnoringCase("(((" + BDDKeyword.getKeyWordRegEx() + ")\\s)?" + def + ")").match(call)) {
 			return false;
 		} else {
 			List<String[]> argsa = getArgsFromCall(origDef, call);
-			if (getArgNames(def).size() != argsa.size())
+			if (getArgNames(origDef).size() != argsa.size())
 				return false;
 		}
 		return true;

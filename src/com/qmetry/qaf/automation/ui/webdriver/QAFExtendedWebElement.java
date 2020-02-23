@@ -1,35 +1,35 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.ui.webdriver;
 
+import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -43,6 +43,7 @@ import org.openqa.selenium.Point;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.remote.DriverCommand;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.RemoteWebElement;
 import org.openqa.selenium.remote.Response;
@@ -52,6 +53,7 @@ import org.testng.SkipException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.qmetry.qaf.automation.core.AutomationError;
 import com.qmetry.qaf.automation.core.ConfigurationManager;
 import com.qmetry.qaf.automation.core.MessageTypes;
 import com.qmetry.qaf.automation.core.QAFListener;
@@ -68,46 +70,54 @@ import com.qmetry.qaf.automation.util.StringMatcher;
 /**
  * com.qmetry.qaf.automation.ui.webdriver.extended.QAFExtendedWebElement.java
  * 
+ * @see ElementMetaDataListener 
+ * @see ApplicationProperties#ELEMENT_GLOBAL_METADATA
+ * @see ApplicationProperties#ELEMENT_ATTACH_DEFAULT_LISTENER 
+ * @see ApplicationProperties#QAF_LISTENERS
  * @author chirag.jayswal
  */
 public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebElementCommandListener, QAFWebElement {
+	private static final Map<String, Object> GLOBAL_METADATA = JSONUtil
+			.toMap(ApplicationProperties.ELEMENT_GLOBAL_METADATA.getStringVal("{'scroll':'OnFail'}"));
 	protected final Log logger = LogFactory.getLog(getClass());
 	transient protected By by;
 	protected QAFExtendedWebElement parentElement;
 	protected String locator;
 	private Map<String, Object> metaData;
-
-	// init default value true to avoid issue for direct initialization by
-	// driver.
-	protected boolean cacheable = true;
+	protected boolean cacheable = false;
 	private Set<QAFWebElementCommandListener> listners = new LinkedHashSet<QAFWebElementCommandListener>();
 	private String description;
 
 	protected QAFExtendedWebElement(QAFExtendedWebDriver driver) {
 		setParent(driver);
 		id = "-1";
-		metaData = new HashMap<String, Object>();
+		metaData = new TreeMap<String, Object>(String.CASE_INSENSITIVE_ORDER);// new HashMap<String, Object>();
+		metaData.putAll(GLOBAL_METADATA);
+		
+		//default value true to avoid issue for direct initialization by driver.
+		cacheable = metaData.containsKey("cacheable") ? (Boolean) metaData.get("cacheable") : true;
 		listners.add(driver.getReporter());
+		if(ApplicationProperties.ELEMENT_ATTACH_DEFAULT_LISTENER.getBoolenVal(true)){
+			listners.add(new ElementMetaDataListener());
+		}
 
 		try {
 			setFileDetector(parent.getFileDetector());
 
 		} catch (Exception e) {
 			logger.debug("FileDetector not found!", e);
-			System.out.println("FileDetector not found! ");
 		}
 		String[] listners = ConfigurationManager.getBundle()
 				.getStringArray(ApplicationProperties.WEBELEMENT_COMMAND_LISTENERS.key);
 		for (String listenr : listners) {
 			registerListeners(listenr);
 		}
-		listners = ConfigurationManager.getBundle()
-				.getStringArray(ApplicationProperties.QAF_LISTENERS.key);
+		listners = ConfigurationManager.getBundle().getStringArray(ApplicationProperties.QAF_LISTENERS.key);
 		for (String listener : listners) {
 			try {
 				QAFListener cls = (QAFListener) Class.forName(listener).newInstance();
-				if(QAFWebElementCommandListener.class.isAssignableFrom(cls.getClass()))
-				this.listners.add((QAFWebElementCommandListener)cls);
+				if (QAFWebElementCommandListener.class.isAssignableFrom(cls.getClass()))
+					this.listners.add((QAFWebElementCommandListener) cls);
 			} catch (Exception e) {
 				logger.error("Unable to register class as element listener:  " + listener, e);
 			}
@@ -142,7 +152,7 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 		this(parentElement, (By) null);
 		initLoc(locator);
 	}
-	
+
 	/**
 	 * 
 	 * @param driver
@@ -217,7 +227,7 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 		this.locator = ConfigurationManager.getBundle().getSubstitutor().replace(this.locator);
 		if (JSONUtil.isValidJsonString(this.locator)) {
 			try {
-				metaData = JSONUtil.toMap(this.locator);
+				metaData.putAll(JSONUtil.toMap(this.locator));
 
 				description = metaData.containsKey("desc") ? (String) metaData.get("desc")
 						: metaData.containsKey("description") ? (String) metaData.get("description") : "";
@@ -241,9 +251,6 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 			Map m = new HashMap<String, String>();
 			m.putAll(parameters);
 			m.put("id", id);
-			if ((null != getBy()) && !cacheable) {
-				id = "-1";
-			}
 			commandTracker.setParameters(m);
 			beforeCommand(this, commandTracker);
 			// already handled in before command?
@@ -255,6 +262,10 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 
 			}
 			afterCommand(this, commandTracker);
+			
+			if ((null != getBy()) && !cacheable) {
+				id = "-1";
+			}
 		} catch (RuntimeException e) {
 			commandTracker.setException(e);
 			onFailure(this, commandTracker);
@@ -273,18 +284,30 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 		return commandTracker.getResponce();
 	}
 
+	protected Response executeWitoutLog(String command, Map<String, ?> parameters){
+		return ((QAFExtendedWebDriver) parent).executeWitoutLog(command,
+				parameters);
+	}
 	@Override
 	public void setId(String id) {
 		super.setId(id);
 	}
 
 	private void load() {
-		if ((id == "-1")) {
+		if (null==id || (id == "-1")) {
+			Map<String, ?> parameters = new HashMap<String, String>();
+			CommandTracker commandTracker = new CommandTracker(DriverCommand.FIND_ELEMENT, parameters);
 			if (parentElement == null) {
+				beforeCommand(this, commandTracker);
 				((QAFExtendedWebDriver) parent).load(this);
+				afterCommand(this, commandTracker);
 			} else {
+				parentElement.load();
+				beforeCommand(this, commandTracker);
 				setId(parentElement.findElement(getBy()).id);
+				afterCommand(this, commandTracker);
 			}
+			
 		}
 	}
 
@@ -385,10 +408,10 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 			}
 
 			result = super.apply(result);
-			if(result instanceof RemoteWebElement){
-				if(!(result instanceof QAFExtendedWebElement)){
+			if (result instanceof RemoteWebElement) {
+				if (!(result instanceof QAFExtendedWebElement)) {
 					QAFExtendedWebElement ele = newRemoteWebElement();
-					ele.setId(((RemoteWebElement)result).getId());
+					ele.setId(((RemoteWebElement) result).getId());
 					return ele;
 				}
 			}
@@ -397,10 +420,23 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 
 		@Override
 		protected QAFExtendedWebElement newRemoteWebElement() {
-			QAFExtendedWebElement toReturn = new QAFExtendedWebElement((QAFExtendedWebDriver) driver);
-			return toReturn;
+			String elemImpl = ConfigurationManager.getBundle().getString("default.element.impl");
+			if(StringUtils.isBlank(elemImpl)){
+				QAFExtendedWebElement toReturn = new QAFExtendedWebElement((QAFExtendedWebDriver) driver);
+				return toReturn;
+			}
+			try {
+				Class<?> cls = Class.forName(ConfigurationManager.getBundle().getString("default.element.impl", QAFExtendedWebElement.class.getCanonicalName()));
+				Constructor<?> con = cls.getDeclaredConstructor(QAFExtendedWebDriver.class);
+				con.setAccessible(true);
+				Object toReturn = con.newInstance(driver);
+				return (QAFExtendedWebElement) toReturn;
+			} catch (ClassNotFoundException e) {
+				throw new AutomationError("Unable to find class "+elemImpl+" to create element. ", e);
+			} catch (Exception e) {
+				throw new AutomationError("Unable to create element using "+elemImpl+". Make sure it is subclass of QAFExtendedWebElement and has consrtuctor excepting QAFExtendedWebDriver argument", e);
+			}
 		}
-
 	}
 
 	@Override
@@ -417,9 +453,42 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 		return ele;
 	}
 
+	public List<WebElement> findElements(By by) {
+		try {
+			return super.findElements(by);
+		} catch (Exception e) {
+			// may be this element present earlier and now not present so
+			// returning element not found exception instead of returning empty
+			// array.
+			return new ArrayList<WebElement>();
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	public List<QAFWebElement> findElements(String loc) {
 		return (List<QAFWebElement>) (List<? extends WebElement>) findElements(LocatorUtil.getBy(loc));
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends QAFExtendedWebElement> List<T> findElements(String loc, Class<T> t) {
+		List<QAFWebElement> eles = findElements(loc);
+		List<T> objs = new ArrayList<T>();
+		for (QAFWebElement ele : eles) {
+			T obj = (T) ComponentFactory.getObject(t, loc, this, this);
+			obj.setId(((QAFExtendedWebElement) ele).getId());
+			obj.parentElement = this;
+			obj.cacheable = true;
+			objs.add(obj);
+		}
+		return objs;
+	}
+
+	@SuppressWarnings("unchecked")
+	public <T extends QAFExtendedWebElement> T findElement(String loc, Class<T> t) {
+		T obj = (T) ComponentFactory.getObject(t, loc, this, this);
+		obj.parentElement = this;
+		obj.getId();
+		return obj;
 	}
 
 	@Override
@@ -453,8 +522,9 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 			parameters.put("id", element.getId());
 			commandTracker.setException(null);
 			commandTracker.setStage(Stage.executingMethod);
-			element.execute(commandTracker.command, parameters);
+			Response response = element.execute(commandTracker.command, parameters);
 			commandTracker.setEndTime(System.currentTimeMillis());
+			commandTracker.setResponce(response);
 		}
 		for (QAFWebElementCommandListener listener : listners) {
 			// whether handled previous listener
@@ -467,10 +537,9 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 	}
 
 	// Wait service
-	@SuppressWarnings("unchecked")
 	public void waitForVisible(long... timeout) {
 		new QAFWebElementWait(this, timeout)
-				.ignore(RuntimeException.class, NoSuchElementException.class, StaleElementReferenceException.class)
+				.ignoring(RuntimeException.class, NoSuchElementException.class, StaleElementReferenceException.class)
 				.withMessage("Wait time out for " + getDescription() + " to be visible")
 				.until(QAFWebElementExpectedConditions.elementVisible());
 	}
@@ -603,6 +672,17 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 				.until(QAFWebElementExpectedConditions.elementCssPropertyValueNotEq(name, value));
 	}
 
+	public void waitForCssStyleColor(String name, String value, long... timeout) {
+		new QAFWebElementWait(this, timeout).ignoring(NoSuchElementException.class, RuntimeException.class)
+				.withMessage("Wait time out for " + getDescription() + " have css style " + name + "=" + value)
+				.until(QAFWebElementExpectedConditions.elementCssColorPropertyValueEq(name, value));
+	}
+
+	public void waitForNotCssStyleColor(String name, String value, long... timeout) {
+		new QAFWebElementWait(this, timeout).ignoring(NoSuchElementException.class, RuntimeException.class)
+				.withMessage("Wait time out for " + getDescription() + " have css style " + name + "!=" + value)
+				.until(QAFWebElementExpectedConditions.elementCssColorPropertyValueNotEq(name, value));
+	}
 	/**
 	 * will only report if failed
 	 * 
@@ -961,6 +1041,40 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 		return outcome;
 	}
 
+	@Override
+	public boolean verifyCssStyleColor(String prop, String value, String... label) {
+		if (!ensurePresent(label))
+			return false;
+
+		boolean outcome = true;
+		String msgFor = getDescription(label);
+		try {
+			waitForCssStyleColor(prop, value);
+		} catch (Exception e) {
+			outcome = false;
+
+		}
+		report("cssstyle", outcome, msgFor, value, getCssValue(prop));
+		return outcome;
+	}
+
+	@Override
+	public boolean verifyNotCssStyleColor(String prop, String value, String... label) {
+		if (!ensurePresent(label))
+			return false;
+
+		boolean outcome = true;
+		String msgFor = getDescription(label);
+		try {
+			waitForNotCssStyleColor(prop, value);
+		} catch (Exception e) {
+			outcome = false;
+
+		}
+		report("notcssstyle", outcome, msgFor, value, getCssValue(prop));
+		return outcome;
+	}
+
 	// preconditions
 	public void givenPresent() {
 		if (!verifyPresent()) {
@@ -1110,6 +1224,20 @@ public class QAFExtendedWebElement extends RemoteWebElement implements QAFWebEle
 		if (!verifyNotCssStyle(name, value, label)) {
 			throw new AssertionError();
 		}
+	}
+
+	@Override
+	public void assertCssStyleColor(String prop, String value, String... label) {
+		if (!verifyCssStyleColor(prop, value, label)) {
+			throw new AssertionError();
+		}		
+	}
+
+	@Override
+	public void assertNotCssStyleColor(String prop, String value, String... label) {
+		if (!verifyNotCssStyleColor(prop, value, label)) {
+			throw new AssertionError();
+		}		
 	}
 
 	@SuppressWarnings("unchecked")

@@ -1,32 +1,24 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to
- * author
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven
- * approach
- * Copyright 2016 Infostretch Corporation
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or any later version.
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE
- * You should have received a copy of the GNU General Public License along with
- * this program in the name of LICENSE.txt in the root folder of the
- * distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- * See the NOTICE.TXT file in root folder of this source files distribution
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- * For any inquiry or need additional information, please contact
- * support-qaf@infostretch.com
- *******************************************************************************/
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.testng.report;
 
 import static com.qmetry.qaf.automation.core.ConfigurationManager.getBundle;
@@ -47,6 +39,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.logging.Log;
@@ -57,6 +51,7 @@ import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
 import org.testng.ITestResult;
 import org.testng.annotations.Test;
+import org.testng.xml.XmlSuite;
 import org.testng.xml.XmlTest;
 
 import com.qmetry.qaf.automation.core.CheckpointResultBean;
@@ -76,7 +71,8 @@ import com.qmetry.qaf.automation.util.StringUtil;
  */
 public class ReporterUtil {
 	private static final Log logger = LogFactoryImpl.getLog(ReporterUtil.class);
-
+	private static final String QAF_TEST_IDENTIFIER = "qaf_test_identifier";
+	private static final AtomicInteger indexer = new AtomicInteger(0);
 	public static void updateMetaInfo(ISuite suite) {
 		createMetaInfo(suite, false);
 	}
@@ -86,19 +82,21 @@ public class ReporterUtil {
 
 	}
 
+	private static Map<XmlSuite, Collection<ISuiteResult>> resultMap= new HashMap<XmlSuite, Collection<ISuiteResult>>();
 	private static void createMetaInfo(ISuite suite, boolean listEntry) {
 		List<XmlTest> tests = suite.getXmlSuite().getTests();
 		List<String> testNames = new ArrayList<String>();
 		for (XmlTest test : tests) {
-			testNames.add(getTestName(test.getName()));
+			testNames.add(getTestName(test));
 		}
+
 		String dir = ApplicationProperties.JSON_REPORT_DIR.getStringVal();
 		Report report = new Report();
 
 		if (!getBundle().containsKey("suit.start.ts")) {
 			dir = ApplicationProperties.JSON_REPORT_DIR
 					.getStringVal(ApplicationProperties.JSON_REPORT_ROOT_DIR.getStringVal(
-							"test-results") + "/" + DateUtil.getDate(0, "EdMMMyy_hhmma"));
+							"test-results") + "/" + DateUtil.getDate(0, "EdMMMyy_hhmmssa"));
 			getBundle().setProperty(ApplicationProperties.JSON_REPORT_DIR.key, dir);
 			FileUtil.checkCreateDir(ApplicationProperties.JSON_REPORT_ROOT_DIR
 					.getStringVal("test-results"));
@@ -113,12 +111,30 @@ public class ReporterUtil {
 
 		int pass = 0, fail = 0, skip = 0, total = 0;
 		Iterator<ISuiteResult> iter = suite.getResults().values().iterator();
+		resultMap.put(suite.getXmlSuite(), suite.getResults().values());
 		while (iter.hasNext()) {
 			ITestContext context = iter.next().getTestContext();
 			pass += getPassCnt(context);
 			skip += getSkipCnt(context);
 			fail += getFailCnt(context) + getFailWithPassPerCnt(context);
 			total += getTotal(context);
+		}
+		List<XmlSuite> childs = suite.getXmlSuite().getChildSuites();
+		for(XmlSuite csuite: childs){
+			tests = csuite.getTests();
+			for (XmlTest test : tests) {
+				testNames.add(getTestName(test));
+			}	
+			if(resultMap.containsKey(csuite)){
+				iter = resultMap.get(csuite).iterator();
+				while (iter.hasNext()) {
+					ITestContext context = iter.next().getTestContext();
+					pass += getPassCnt(context);
+					skip += getSkipCnt(context);
+					fail += getFailCnt(context) + getFailWithPassPerCnt(context);
+					total += getTotal(context);
+				}
+			}
 		}
 		report.setPass(pass);
 		report.setFail(fail);
@@ -244,17 +260,19 @@ public class ReporterUtil {
 			methodResult.setThrowable(result.getThrowable());
 
 			updateOverview(context, result);
-
-			String fileName = StringUtil.toTitleCaseIdentifier(getMethodName(result));
+			String fileName = getMethodIdentifier(result);//StringUtil.toTitleCaseIdentifier(getMethodName(result));
 			String methodResultFile = dir + "/" + fileName;
 
 			File f = new File(methodResultFile + ".json");
 			if (f.exists()) {
 				// if file already exists then it will append some random
 				// character as suffix
-				fileName += StringUtil.getRandomString("aaaaaaaaaa");
+				String suffix = "_"+indexer.incrementAndGet();
+				fileName += suffix;
 				// add updated file name as 'resultFileName' key in metaData
 				methodResultFile = dir + "/" + fileName;
+				result.setAttribute(QAF_TEST_IDENTIFIER,fileName);
+
 				updateClassMetaInfo(context, result, fileName);
 			} else {
 				updateClassMetaInfo(context, result, fileName);
@@ -358,6 +376,40 @@ public class ReporterUtil {
 	private static String getMethodName(ITestResult result) {
 		return result.getName();
 	}
+	
+	@SuppressWarnings("unchecked")
+	private static String getMethodIdentifier(ITestResult result){
+
+		if(result.getAttribute(QAF_TEST_IDENTIFIER)!=null){
+			return (String) result.getAttribute(QAF_TEST_IDENTIFIER);
+		}
+		
+		String id = getMethodName(result);
+		String identifierKey = ApplicationProperties.TESTCASE_IDENTIFIER_KEY.getStringVal("testCaseId");
+
+		Map<String, Object> metadata =
+				new TreeMap<String, Object>(String.CASE_INSENSITIVE_ORDER);
+	
+		if (result.getMethod() instanceof TestNGScenario) {
+			TestNGScenario scenario = (TestNGScenario) result.getMethod();
+			metadata.putAll(scenario.getMetaData());
+		}
+		if(result.getParameters()!=null && result.getParameters().length>0){
+			if(result.getParameters()[0] instanceof Map<?, ?>){
+				metadata.putAll((Map<String, Object>)result.getParameters()[0]);
+			}
+		}
+		if(metadata.containsKey(identifierKey)){
+			id= metadata.get(identifierKey).toString();
+		}
+		id=StringUtil.toTitleCaseIdentifier(id);
+		
+		if(id.length()>45){
+			id=id.substring(0, 45);
+		}
+		result.setAttribute(QAF_TEST_IDENTIFIER,id);
+		return (String) result.getAttribute(QAF_TEST_IDENTIFIER);
+	}
 
 	private static String getClassDir(ITestContext context, ITestResult result) {
 		String testName = getTestName(context);
@@ -397,12 +449,16 @@ public class ReporterUtil {
 		}
 	}
 
+	private static String getTestName(XmlTest context) {
+		return getTestName(context.getSuite().getName()+"_"+context.getName());
+
+	}
 	private static String getTestName(ITestContext context) {
 		if (context == null) {
 			context = (ITestContext) ConfigurationManager.getBundle()
 					.getObject(ApplicationProperties.CURRENT_TEST_CONTEXT.key);
 		}
-		return getTestName(context.getName());
+		return getTestName(context.getCurrentXmlTest());
 
 	}
 

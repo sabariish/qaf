@@ -1,23 +1,24 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!--
- QMetry Automation Framework provides a powerful and versatile platform to author
- Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- 
- Copyright 2016 Infostretch Corporation
- 
- This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- 
- This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- 
- IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- 
- You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- 
- See the NOTICE.TXT file in root folder of this source files distribution
- for additional information regarding copyright ownership and licenses
- of other open source software / files used by QMetry Automation Framework.
+Copyright (c) 2019 Infostretch Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
  
  For any inquiry or need additional information, please contact support-qaf@infostretch.com
  
@@ -25,7 +26,7 @@
 <ivy-module version="2.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
-	<info organisation="com.qmetry" module="qaf" status="release" revision="2.1.8">
+	<info organisation="com.qmetry" module="qaf" status="release" revision="${release.num}">
 	</info>
 	
 	<configurations>
@@ -79,7 +80,7 @@
 		<dependency org="org.aspectj" name="aspectjtools" rev="1.8.9" conf="compile->default">
 			<artifact name="aspectjtools" type="jar"></artifact>
 		</dependency>
-
+		<dependency org="javax.xml.bind" name="jaxb-api" rev="2.3.1"  conf="test->default"/>
 		<!-- excel -->
 		<dependency org="net.sourceforge.jexcelapi" name="jxl" rev="2.6.12" conf="compile->default">
 			<artifact name="jxl" type="jar"></artifact>
@@ -92,7 +93,7 @@
 		<dependency org="commons-lang" name="commons-lang" rev="2.6" conf="compile->default"/>
 
 		<dependency org="commons-io" name="commons-io" rev="2.5" conf="compile->default"/>
-		<dependency org="com.google.code.gson" name="gson" rev="2.1" conf="compile->default">
+		<dependency org="com.google.code.gson" name="gson" rev="2.8.5" conf="compile->default">
 			<artifact name="gson" type="jar"></artifact>
 		</dependency>
 
@@ -111,12 +112,14 @@
 
 		<!-- min rev 2.34.0 -->
 		<dependency org="org.seleniumhq.selenium" name="selenium-remote-driver"
-			rev="2.53.0" conf="compile->default"/>
+			rev="3.0.0" conf="compile->default"/>
 		<dependency org="org.seleniumhq.selenium" name="selenium-java"
-			rev="2.53.0" conf="compile->default"/>
-		<!--
+			rev="3.0.0" conf="compile->default">
+			<exclude org="com.codeborne"/>
+		</dependency>
+		<!-- -->
 		<dependency org="org.seleniumhq.selenium" name="selenium-leg-rc" rev="3.0.0"/>
-        	-->
+        	
 		
 		<!-- ws 
 		<dependency org="xmlunit" name="xmlunit" rev="1.4" />
@@ -132,8 +135,10 @@
 		<dependency org="info.cukes" name="cucumber-java" rev="1.2.4"  conf="test->default"/>
 		<!-- <dependency org="info.cukes" name="cucumber-testng" rev="1.2.4" /> -->
 
-		<dependency org="org.json" name="json" rev="20160810" conf="compile->default"/>
+		<dependency org="org.json" name="json" rev="20180813" conf="compile->default"/>
 		<dependency org="javax.mail" name="mail" rev="1.4.7"/>
-
+		
+		<!--  https://github.com/SeleniumHQ/selenium/issues/3118 -->
+		<exclude org="com.codeborne"/>
 	</dependencies>
 </ivy-module>

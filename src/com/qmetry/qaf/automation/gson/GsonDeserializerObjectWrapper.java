@@ -1,49 +1,137 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to
- * author
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven
- * approach
- * Copyright 2016 Infostretch Corporation
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or any later version.
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE
- * You should have received a copy of the GNU General Public License along with
- * this program in the name of LICENSE.txt in the root folder of the
- * distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- * See the NOTICE.TXT file in root folder of this source files distribution
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- * For any inquiry or need additional information, please contact
- * support-qaf@infostretch.com
- *******************************************************************************/
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.gson;
 
-import static com.qmetry.qaf.automation.gson.GsonObjectDeserializer.read;
+import static com.qmetry.qaf.automation.util.ClassUtil.isAssignableFrom;
 
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonPrimitive;
+import com.qmetry.qaf.automation.util.ClassUtil;
+
 /**
  * @author chirag.jayswal
  */
 public class GsonDeserializerObjectWrapper implements JsonDeserializer<ObjectWrapper> {
+	JsonDeserializationContext context;
+	private Type type;
+
+	public GsonDeserializerObjectWrapper(Type type) {
+		this.type = type;
+	}
+
+	public void setType(Type type) {
+		this.type = type;
+	}
 
 	@Override
-	public ObjectWrapper deserialize(JsonElement json, Type typeOfT,
-			JsonDeserializationContext context) throws JsonParseException {
-		return new ObjectWrapper(read(json));
+	public ObjectWrapper deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
+			throws JsonParseException {
+		this.context = context;
+		return new ObjectWrapper(read(json, type));
 	}
+
+	private Object read(JsonElement in, Type typeOfT) {
+		
+		if (in.isJsonArray()) {
+			JsonArray arr = in.getAsJsonArray();
+
+			boolean isArray = isArray(typeOfT);
+			Collection<Object> list = isArray ? new ArrayList<Object>()
+					: context.deserialize(new JsonArray(0), typeOfT);
+			for (JsonElement anArr : arr) {
+				((Collection<Object>) list).add(read(anArr, getTypeArguments(typeOfT, 0)));
+			}
+			if (isArray) {
+				return toArray((List<Object>) list);
+			}
+			try {
+				return ClassUtil.getClass(typeOfT).cast(list);
+			} catch (Exception e) {
+				return context.deserialize(in, typeOfT);
+			}
+		} else if (in.isJsonObject()
+				&& (isAssignableFrom(typeOfT, Map.class) || ClassUtil.getClass(typeOfT).equals(Object.class))) {
+			Map<Object, Object> map = context.deserialize(new JsonObject(), typeOfT);//new LinkedTreeMap<Object, Object>();
+			JsonObject obj = in.getAsJsonObject();
+			Set<Map.Entry<String, JsonElement>> entitySet = obj.entrySet();
+			for (Map.Entry<String, JsonElement> entry : entitySet) {
+				map.put(entry.getKey(), read(entry.getValue(), getTypeArguments(typeOfT, 1)));
+			}
+			return map;
+		} else if (in.isJsonPrimitive() && ClassUtil.getClass(typeOfT).equals(Object.class)) {
+			JsonPrimitive prim = in.getAsJsonPrimitive();
+			if (prim.isBoolean()) {
+				return prim.getAsBoolean();
+			} else if (prim.isString()) {
+				return prim.getAsString();
+			} else if (prim.isNumber()) {
+				if (prim.getAsString().contains("."))
+					return prim.getAsDouble();
+				else {
+					return prim.getAsLong();
+				}
+			}
+		}
+		return context.deserialize(in, typeOfT);
+	}
+
+	private Type getTypeArguments(Type typeOfT, int index) {
+		try {
+			return ((ParameterizedType) typeOfT).getActualTypeArguments()[index];
+		} catch (Exception e) {
+			try {
+				Class<?> ctype = ClassUtil.getClass(typeOfT).getComponentType();
+				if (null != ctype) {
+					return ctype;
+				}
+			} catch (Exception e1) {
+				e1.printStackTrace();
+			}
+		}
+		return Object.class;
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T> T[] toArray(List<T> list) {
+		Class<?> clazz = list.get(0).getClass(); // check for size and null before
+		T[] array = (T[]) java.lang.reflect.Array.newInstance(clazz, list.size());
+		return list.toArray(array);
+	}
+
+	private boolean isArray(Type typeOfT) {
+		return ClassUtil.getClass(typeOfT).isArray();
+	}
+
 }

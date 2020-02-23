@@ -1,26 +1,24 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.step.client;
 
 import java.util.ArrayList;
@@ -42,11 +40,10 @@ import com.google.gson.JsonSyntaxException;
 import com.qmetry.qaf.automation.gson.GsonObjectDeserializer;
 import com.qmetry.qaf.automation.step.StringTestStep;
 import com.qmetry.qaf.automation.step.TestStep;
-import com.qmetry.qaf.automation.testng.dataprovider.QAFDataProvider.params;
 import com.qmetry.qaf.automation.util.FileUtil;
 import com.qmetry.qaf.automation.util.JSONUtil;
 import com.qmetry.qaf.automation.util.StringUtil;
-
+import static com.qmetry.qaf.automation.data.MetaDataScanner.hasDP;
 /**
  * @author chirag.jayswal
  */
@@ -114,7 +111,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 	 */
 	protected abstract Collection<Object[]> parseFile(String scenarioFile);
 
-	protected void processStatements(Object[][] statements, String referece, List<Scenario> scenarios) {
+	protected void processStatements(Object[][] statements, String reference, List<Scenario> scenarios) {
 
 		for (int statementIndex = 0; statementIndex < statements.length; statementIndex++) {
 
@@ -137,15 +134,15 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 
 			// Custom step definition
 			if (type.equalsIgnoreCase(STEP_DEF)) {
-				statementIndex = parseStepDef(statements, statementIndex, referece);
+				statementIndex = parseStepDef(statements, statementIndex, reference);
 			} else if (type.equalsIgnoreCase(SCENARIO)) {
-				statementIndex = parseScenario(statements, statementIndex, referece, scenarios);
+				statementIndex = parseScenario(statements, statementIndex, reference, scenarios);
 			}
 		}
 
 	}
 
-	protected int parseStepDef(Object[][] statements, int statementIndex, String referece) {
+	protected int parseStepDef(Object[][] statements, int statementIndex, String reference) {
 
 		Object[] stepDef = statements[statementIndex];
 
@@ -157,7 +154,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 
 		CustomStep customStep = new CustomStep(stepName, StringUtil.isBlank(description) ? stepName : description,
 				steps);
-		customStep.setFileName(referece);
+		customStep.setFileName(reference);
 		customStep.setLineNumber(lineNo);
 
 		String nextSteptype = "";
@@ -171,7 +168,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 				StringTestStep step = new StringTestStep((String) statements[statementIndex][0],
 						gson.fromJson((String) statements[statementIndex][1], Object[].class));
 				step.setResultParamName((String) statements[statementIndex][2]);
-				step.setFileName(referece);
+				step.setFileName(reference);
 				step.setLineNumber(lineNo);
 				steps.add(step);
 			}
@@ -215,7 +212,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 	}
 
 	@SuppressWarnings("unchecked")
-	protected int parseScenario(Object[][] statements, int statementIndex, String referece, List<Scenario> scenarios) {
+	protected int parseScenario(Object[][] statements, int statementIndex, String reference, List<Scenario> scenarios) {
 
 		String description = statements[statementIndex].length > 2 ? (String) statements[statementIndex][2] : "";
 		String stepName = statements[statementIndex].length > 1 ? ((String) statements[statementIndex][1]).trim() : "";
@@ -229,7 +226,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 		if (StringUtil.isNotBlank(description)) {
 			metadata.putAll(gson.fromJson(description, Map.class));
 		}
-		metadata.put("referece", referece);
+		metadata.put("reference", reference);
 		metadata.put("lineNo", lineNo);
 
 		/**
@@ -238,10 +235,10 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 		 * in method filter where it will not include groups from xml
 		 * configuration file.
 		 */
-		if (include(includeGroups, excludeGroups, metadata)) {
-			String dataProvider = getDP(metadata);
-			Scenario scenario = StringUtil.isBlank(dataProvider) ? new Scenario(stepName, steps, metadata)
-					: new DataDrivenScenario(stepName, steps, dataProvider, metadata);
+		if (include(metadata)) {
+			boolean dataProvider = hasDP(metadata);
+			Scenario scenario = dataProvider ? new DataDrivenScenario(stepName, steps, metadata)
+					: new Scenario(stepName, steps, metadata);
 
 			scenarios.add(scenario);
 		} else {
@@ -254,7 +251,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 
 			String currStepName = (String) statements[statementIndex][0];
 			if (!currStepName.equalsIgnoreCase(END)) {
-				TestStep step = parseStepCall(statements[statementIndex], referece, lineNo);
+				TestStep step = parseStepCall(statements[statementIndex], reference, lineNo);
 				steps.add(step);
 			}
 
@@ -270,7 +267,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 
 	}
 
-	protected TestStep parseStepCall(Object[] statement, String referece, int lineNo) {
+	protected TestStep parseStepCall(Object[] statement, String reference, int lineNo) {
 
 		String currStepName = (String) statement[0];
 		Object[] currStepArgs = null;
@@ -284,7 +281,7 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 
 		StringTestStep step = new StringTestStep(currStepName, currStepArgs);
 		step.setResultParamName(currStepRes);
-		step.setFileName(referece);
+		step.setFileName(reference);
 		step.setLineNumber(lineNo);
 
 		return step;
@@ -300,27 +297,23 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 		}
 	}
 
-	protected String getDP(Map<String, Object> metadata) {
-		String dataProvider = "";
-		for (params key : params.values()) {
-			if (metadata.containsKey(key.name())) {
-				dataProvider = String.format("%s%s%s=%s", dataProvider, StringUtil.isNotBlank(dataProvider) ? ";" : "",
-						key, metadata.get(key.name()));
-			}
-		}
-		return dataProvider;
-	}
-
 	/**
 	 * To apply groups and enabled filter
-	 * 
-	 * @param includeGroups
-	 * @param excludeGroups
 	 * @param metadata
 	 * @return
 	 */
+	protected boolean include(Map<String, Object> metadata) {
+		return include(metadata, includeGroups);
+	}
+	
+	/**
+	 * To apply groups and enabled filter with default group is group to include not specified
+	 * @param metadata
+	 * @param defInclude
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
-	protected boolean include(List<String> includeGroups, List<String> excludeGroups, Map<String, Object> metadata) {
+	protected boolean include(Map<String, Object> metadata, List<String> defInclude) {
 		// check for enabled
 		if (metadata.containsKey("enabled") && !((Boolean) metadata.get("enabled")))
 			return false;
@@ -329,8 +322,10 @@ public abstract class AbstractScenarioFileParser implements ScenarioFileParser {
 				? (List<String>) metadata.get(ScenarioFactory.GROUPS) : new ArrayList<String>());
 		if (!includeGroups.isEmpty()) {
 			groups.retainAll(includeGroups);
+		}else{
+			groups.retainAll(defInclude);
 		}
 		groups.removeAll(excludeGroups);
-		return (!groups.isEmpty() || (includeGroups.isEmpty() && excludeGroups.isEmpty()));
+		return (!groups.isEmpty() || (includeGroups.isEmpty() && defInclude.isEmpty() && excludeGroups.isEmpty()));
 	}
 }

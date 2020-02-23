@@ -1,33 +1,31 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.util;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -37,8 +35,17 @@ import java.util.WeakHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang.StringUtils;
+import org.json.CDL;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 public class StringUtil extends StringUtils {
 	/**
@@ -48,15 +55,18 @@ public class StringUtil extends StringUtils {
 	public static String getTitleCase(String str) {
 		return str.substring(0, 1).toUpperCase() + str.substring(1);
 	}
-	
+
 	/**
 	 * Utility method to create variable or method name from string.
+	 * 
 	 * @param formStr
 	 * @return
 	 */
 	public static String toCamelCaseIdentifier(String formStr) {
 		StringBuffer res = new StringBuffer();
-
+		if(isEmpty(formStr)){
+			return "";
+		}
 		formStr = formStr.replaceAll("\\{(\\d)*(\\s)*\\}", "");
 		String[] strArr = formStr.split("\\W");
 		int i = 0;
@@ -65,7 +75,8 @@ public class StringUtil extends StringUtils {
 				char[] stringArray = str.trim().toCharArray();
 				if (i == 0)
 					stringArray[0] = Character.toLowerCase(stringArray[0]);
-				else stringArray[0] = Character.toUpperCase(stringArray[0]);
+				else
+					stringArray[0] = Character.toUpperCase(stringArray[0]);
 				str = new String(stringArray);
 
 				res.append(str);
@@ -78,7 +89,7 @@ public class StringUtil extends StringUtils {
 	public static String toTitleCaseIdentifier(String formStr) {
 		return getTitleCase(toCamelCaseIdentifier(formStr));
 	}
-	
+
 	public static String getRandomString(String format) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < format.length(); i++) {
@@ -242,6 +253,14 @@ public class StringUtil extends StringUtils {
 		return true;
 	}
 
+	/**
+	 * 
+	 * @param prefix
+	 * @param expectedPattern
+	 * @param actual
+	 * @param flags
+	 * @return
+	 */
 	public static Boolean handleRegex(String prefix, String expectedPattern, String actual, int flags) {
 		if (expectedPattern.startsWith(prefix)) {
 			String expectedRegEx = expectedPattern.replaceFirst(prefix, "");// +
@@ -272,9 +291,9 @@ public class StringUtil extends StringUtils {
 	 * @return
 	 */
 	public static Map<String, String> toMap(String csvKeyVal, boolean ensureKeyUppercase, char... ch) {
-		String[] params = StringUtil.parseCSV(csvKeyVal, ch);
+		Object[] params = StringUtil.parseCSV(csvKeyVal, ch);
 
-		return toMap(params, ensureKeyUppercase);
+		return toMap((String[]) params, ensureKeyUppercase);
 	}
 
 	/**
@@ -291,7 +310,7 @@ public class StringUtil extends StringUtils {
 		}
 		for (String param : csvKeyVal) {
 			if (isNotBlank(param)) {
-				String[] kv = param.split("=");
+				String[] kv = param.split("=", 2);
 				map.put(ensureKeyUppercase ? kv[0].toUpperCase() : kv[0], kv.length > 1 ? (kv[1]) : "");
 			}
 		}
@@ -300,7 +319,22 @@ public class StringUtil extends StringUtils {
 
 	/**
 	 * Method to parse character separated values, generic version of comma
-	 * separated values Supports escape Character
+	 * separated values Supports escape Character. It also supports quoted
+	 * string.Examples:
+	 * <ul>
+	 * <li>"a",1,true,1.5 -> ["a",1,true,1.5]
+	 * <li>"a,b",1,true,1.5 -> ["a,b",1,true,1.5]
+	 * <li>" a ",1,true,1.5 -> [" a ",1,true,1.5]
+	 * <li>,,, -> [null,null,null,null]
+	 * <li>" a " , 1 , true , 1.5 ->[" a ",1,true,1.5]
+	 * <li>a | 1 | true | 1.5 Separator |->["a",1,true,1.5]
+	 * <li>" a "| 1 |true| 1.5 ->Separator |[" a ",1,true,1.5]
+	 * <li>"a, b"| 1 |true| 1.5 ->Separator |["a, b",1,true,1.5]
+	 * <li>a b | 1 |true| 1.5 ->Separator |["a b",1,true,1.5]
+	 * <li>"a\" b" | 1 |true| 1.5 ->Separator |["a\" b",1,true,1.5]
+	 * <li> | | |  ->Separator |[null,null,null,null]
+	 * <li>"a"" b" | 1 |true| 1.5 ->Separator |["a\" b",1,true,1.5]
+
 	 * 
 	 * @param data
 	 * @param char[]
@@ -309,15 +343,32 @@ public class StringUtil extends StringUtils {
 	 *            char[1] : escape charter - default value '\'
 	 * @return
 	 */
-	public static String[] parseCSV(String data, char... ch) {
-		List<String> values = new ArrayList<String>();
-		char seperator = ((null == ch) || (ch.length < 1) || (ch[0] == NULL)) ? ',' : ch[0];
+	public static Object[] parseCSV(String data, char... ch) {
+		List<Object> values = new ArrayList<Object>();
+		boolean hasSeperator = null != ch && ch.length > 0 && ch[0] != NULL && ch[0] != ',';
+		char seperator = hasSeperator ? ch[0] : ',';
 		char escapeChar = ((null == ch) || (ch.length < 2) || (ch[1] == NULL)) ? '\\' : ch[1];
+		
+		if (data.indexOf(escapeChar + "" + seperator) < 0) {
+			//without escape char for separator
+			if (hasSeperator && data.contains(",")) {
+				data = ensuerStringQuated(data, seperator);
+			}
+			
+			String commaSperatoredData = data.replace(seperator, ',');
+			//fix ignored end column if it is null 
+			if(commaSperatoredData.trim().endsWith(",")){
+				commaSperatoredData = commaSperatoredData+"\"\"";
+			}
+			
+			return getArrayFromCsv(commaSperatoredData);
+		}
+		//to continue support old way with use of escape char without quoted string
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < data.length(); ++i) {
 			char c = data.charAt(i);
 			if (c == seperator) {
-				values.add(sb.toString());
+				values.add(toObject(sb.toString()));
 				sb = new StringBuilder();
 				continue;
 			} else if (c == escapeChar) {
@@ -326,9 +377,9 @@ public class StringUtil extends StringUtils {
 			}
 			sb.append(c);
 		}
-		values.add(sb.toString());
+		values.add(toObject(sb.toString()));
 
-		return (values.toArray(new String[values.size()]));
+		return (values.toArray(new Object[values.size()]));
 	}
 
 	/**
@@ -439,5 +490,79 @@ public class StringUtil extends StringUtils {
 		default:
 			return number + "th";
 		}
+	}
+
+	/**
+	 * 
+	 * @param expression
+	 * @return
+	 * @throws ScriptException
+	 */
+	public static <T> T eval(String expression) throws ScriptException {
+		return eval(expression, Collections.emptyMap());
+	}
+
+	/**
+	 * 
+	 * @param expression
+	 * @param context
+	 * @return
+	 * @throws ScriptException
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T eval(String expression, Map<? extends String, ? extends Object> context)
+			throws ScriptException {
+		ScriptEngineManager engineManager = new ScriptEngineManager();
+		ScriptEngine jsEngine = engineManager.getEngineByName("JavaScript");
+		jsEngine.getBindings(ScriptContext.ENGINE_SCOPE).putAll(context);
+		return (T) jsEngine.eval(expression);
+	}
+
+	/**
+	 * Try to convert a string into java primitive type, java object or null. If the
+	 * string can't be converted, return the string. It will return null for empty string.
+	 * 
+	 * @param string
+	 * @return Object
+	 */
+	public static Object toObject(String string) {
+		if(StringUtil.isNotEmpty(string)){
+			return JSONObject.stringToValue(string);
+		}
+		return null;
+	}
+
+	private static String ensuerStringQuated(String data, char seperator) {
+		if(isBlank(data) || data.indexOf(seperator)<0){
+			return data;
+		}
+		StringBuilder sb = new StringBuilder();
+		String[] parts = data.split(Pattern.quote(String.valueOf(seperator)),-1);
+		for (String part : parts) {
+			part = part.trim();
+			if (part.indexOf(',') >= 0 && !part.startsWith("\"") && !part.endsWith("\"")) {
+				sb.append(JSONObject.quote(part));
+			} else {
+				sb.append(part);
+			}
+			sb.append(seperator);
+		}
+		return sb.deleteCharAt(sb.length() - 1).toString();
+	}
+	
+	/**
+	 * 
+	 * @param csv
+	 * @return
+	 */
+	private static Object[] getArrayFromCsv(String csv){
+		JSONArray obj = CDL.rowToJSONArray(new JSONTokener(csv));
+	
+		List<Object> strings = obj.toList();
+		Object[] array = new Object[strings.size()];
+		for (int i=0; i<strings.size();i++){
+			array[i]=toObject((String) strings.get(i));
+		}
+		return array;
 	}
 }

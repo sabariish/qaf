@@ -1,32 +1,24 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to
- * author
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven
- * approach
- * Copyright 2016 Infostretch Corporation
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or any later version.
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE
- * You should have received a copy of the GNU General Public License along with
- * this program in the name of LICENSE.txt in the root folder of the
- * distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- * See the NOTICE.TXT file in root folder of this source files distribution
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- * For any inquiry or need additional information, please contact
- * support-qaf@infostretch.com
- *******************************************************************************/
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.core;
 
 import java.lang.reflect.Method;
@@ -40,7 +32,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.impl.LogFactoryImpl;
 import org.openqa.selenium.WebDriverException;
-import org.openqa.selenium.support.ui.FluentWait;
 import org.testng.ITestResult;
 import org.testng.Reporter;
 
@@ -49,7 +40,9 @@ import com.qmetry.qaf.automation.keys.ApplicationProperties;
 import com.qmetry.qaf.automation.ui.UiDriver;
 import com.qmetry.qaf.automation.ui.UiDriverFactory;
 import com.qmetry.qaf.automation.ui.WebDriverTestBase;
+import com.qmetry.qaf.automation.ui.util.DynamicWait;
 import com.qmetry.qaf.automation.ui.util.ExpectedCondition;
+import com.qmetry.qaf.automation.ui.webdriver.QAFExtendedWebDriver;
 import com.qmetry.qaf.automation.util.FileUtil;
 import com.qmetry.qaf.automation.util.PropertyUtil;
 import com.qmetry.qaf.automation.util.StringMatcher;
@@ -68,8 +61,8 @@ import com.qmetry.qaf.automation.util.StringUtil;
 public class QAFTestBase {
 	private static final String COMMAND_LOG = "commandLog";
 	private static final String CHECKPOINTS = "checkPointResults";
-	private static final String  CONTEXT= "qafcontext";
-	private static final String  VERIFICATION_ERRORS= "verificationErrors";
+	private static final String CONTEXT = "qafcontext";
+	private static final String VERIFICATION_ERRORS = "verificationErrors";
 	public static final String SELENIUM_DEFAULT_TIMEOUT = "selenium.wait.timeout";
 	private Map<String, UiDriver> driverContext;
 
@@ -83,6 +76,7 @@ public class QAFTestBase {
 	private String screenShotDir;
 	private String reportDir;
 	private PropertyUtil context;
+
 	/**
 	 * QAFTestBase setup arguments
 	 * 
@@ -187,10 +181,12 @@ public class QAFTestBase {
 			UiDriver uiDriver = (UiDriver) drivercontext.get(driver);
 			if (null != uiDriver) {
 				new UiDriverFactory().tearDown(uiDriver);
+				if (getDriverName().equalsIgnoreCase(driver)) {
+					setDriver("");
+				}
 			}
 			drivercontext.remove(driver);
 		}
-		setDriver("");
 	}
 
 	/** checks for verification errors and stops the browser */
@@ -201,13 +197,23 @@ public class QAFTestBase {
 			new UiDriverFactory().tearDown(uiDriver);
 		}
 		drivercontext.remove(driverName);
-		if (getBaseUrl().equalsIgnoreCase(driverName)) {
+		if (getDriverName().equalsIgnoreCase(driverName)) {
 			setDriver("");
 		}
 	}
 
 	public void setDriver(String driverName) {
 		stb = STBArgs.browser_str.set(driverName);
+		// make sure driver specific resource are loaded when switch between
+		// driver
+		if (StringUtil.isNotBlank(driverName) && hasDriver()) {
+			UiDriverFactory.loadDriverResouces(driverName);
+			 UiDriver driver = getDriverContext().get(driverName);
+			if (null != driver && driver instanceof QAFExtendedWebDriver) {
+				ConfigurationManager.getBundle().setProperty("driver.actualCapabilities",
+						((QAFExtendedWebDriver) driver).getCapabilities().asMap());
+			}
+		}
 	}
 
 	public void setDriver(String driverName, UiDriver driver) {
@@ -238,7 +244,7 @@ public class QAFTestBase {
 	 */
 	public boolean hasDriver() {
 		String driverName = getDriverName();
-		return hasDriver(driverName);
+		return StringUtil.isNotBlank(driverName) && hasDriver(driverName);
 	}
 
 	public UiDriver getUiDriver() {
@@ -249,7 +255,7 @@ public class QAFTestBase {
 	}
 
 	/** Sleeps for the specified number of milliseconds */
-	public static void pause(int millisecs) {
+	public static void pause(long millisecs) {
 		try {
 			Thread.sleep(millisecs);
 		} catch (InterruptedException e) {
@@ -392,7 +398,7 @@ public class QAFTestBase {
 		setLastCapturedScreenShot("");
 
 		if (type == MessageTypes.Fail) {
-			int verificationErrors = getVerificationErrors() +1;
+			int verificationErrors = getVerificationErrors() + 1;
 			getContext().setProperty(VERIFICATION_ERRORS, verificationErrors);
 		}
 
@@ -400,15 +406,16 @@ public class QAFTestBase {
 
 	public PropertyUtil getContext() {
 		ITestResult tr = Reporter.getCurrentTestResult();
-		if(null!=tr){
+		if (null != tr) {
 			PropertyUtil contextFromTr = (PropertyUtil) Reporter.getCurrentTestResult().getAttribute(CONTEXT);
-			if(null==contextFromTr){
-				Reporter.getCurrentTestResult().setAttribute(CONTEXT,context);
+			if (null == contextFromTr) {
+				Reporter.getCurrentTestResult().setAttribute(CONTEXT, context);
 				return context;
 			}
 			return contextFromTr;
 		}
-		return 	context;//(PropertyUtil) Reporter.getCurrentTestResult().getAttribute(CONTEXT);
+		return context;// (PropertyUtil)
+						// Reporter.getCurrentTestResult().getAttribute(CONTEXT);
 	}
 
 	// base logging and checkpoint
@@ -507,9 +514,12 @@ public class QAFTestBase {
 	private String base64ImageToFile(String base64Image) {
 		String filename = "";
 		try {
-			filename = FileUtil.saveImageFile(base64Image,
-					StringUtil.createRandomString(StringUtil.toTitleCaseIdentifier(getTestCaseName())),
-					getScreenShotDir());
+			String tcname = StringUtil.toTitleCaseIdentifier(getTestCaseName());
+			// too long file name may not supported in some os
+			if (tcname.length() > 25) {
+				tcname.substring(0, 25);
+			}
+			filename = FileUtil.saveImageFile(base64Image, StringUtil.createRandomString(tcname), getScreenShotDir());
 			lastCapturedScreenShot = filename;
 			logger.debug("Capturing screen shot" + lastCapturedScreenShot);
 
@@ -567,18 +577,18 @@ public class QAFTestBase {
 
 	}
 
-	private class UiDriverInitializer extends FluentWait<UiDriverFactory> {
+	private class UiDriverInitializer extends DynamicWait<UiDriverFactory> {
 
 		public UiDriverInitializer() {
 			super(new UiDriverFactory());
 		}
 
-		@Override
-		protected RuntimeException timeoutException(String message, Throwable lastException) {
-			AutomationError ae = new AutomationError(message + "\n" + lastException.getCause().getMessage());
-			ae.setStackTrace(lastException.getCause().getStackTrace());
-			return ae;
-		}
+//		@Override
+//		protected RuntimeException timeoutException(String message, Throwable lastException) {
+//			AutomationError ae = new AutomationError(message + "\n" + lastException.getCause().getMessage());
+//			ae.setStackTrace(lastException.getCause().getStackTrace());
+//			return ae;
+//		}
 
 	}
 

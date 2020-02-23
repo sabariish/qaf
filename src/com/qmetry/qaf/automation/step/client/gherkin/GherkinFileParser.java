@@ -1,32 +1,24 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to
- * author
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven
- * approach
- * Copyright 2016 Infostretch Corporation
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or any later version.
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE
- * You should have received a copy of the GNU General Public License along with
- * this program in the name of LICENSE.txt in the root folder of the
- * distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- * See the NOTICE.TXT file in root folder of this source files distribution
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- * For any inquiry or need additional information, please contact
- * support-qaf@infostretch.com
- *******************************************************************************/
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.step.client.gherkin;
 
 import java.io.BufferedReader;
@@ -36,7 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,18 +56,15 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 	public static final String FEATURE = "Feature";
 	public static final String BACKGROUND = "Background";
 
-	protected void processStatements(Object[][] statements, String referece,
-			List<Scenario> scenarios) {
+	protected void processStatements(Object[][] statements, String reference, List<Scenario> scenarios) {
 
-		for (int statementIndex =
-				0; statementIndex < statements.length; statementIndex++) {
+		for (int statementIndex = 0; statementIndex < statements.length; statementIndex++) {
 
 			String type = ((String) statements[statementIndex][0]).trim();
 
 			// ignore blanks and statements outside scenario or step-def
-			if (StringUtil.isBlank(type)
-					|| !(type.equalsIgnoreCase(FEATURE) || type.equalsIgnoreCase(SCENARIO)
-							|| type.equalsIgnoreCase(EXAMPLES))) {
+			if (StringUtil.isBlank(type) || !(type.equalsIgnoreCase(FEATURE) || type.equalsIgnoreCase(SCENARIO)
+					|| type.equalsIgnoreCase(EXAMPLES))) {
 				String nextSteptype = "";
 				do {
 					statementIndex++;
@@ -84,17 +73,16 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 					} else {
 						nextSteptype = END; //
 					}
-				} while (!(nextSteptype.equalsIgnoreCase(EXAMPLES)
-						|| nextSteptype.equalsIgnoreCase(SCENARIO)
+					type = nextSteptype;
+				} while (!(nextSteptype.equalsIgnoreCase(EXAMPLES) || nextSteptype.equalsIgnoreCase(SCENARIO)
 						|| nextSteptype.equalsIgnoreCase(END)));
 			}
 
 			// Custom step definition
 			if (type.equalsIgnoreCase(STEP_DEF)) {
-				statementIndex = parseStepDef(statements, statementIndex, referece);
+				statementIndex = parseStepDef(statements, statementIndex, reference);
 			} else if (type.equalsIgnoreCase(SCENARIO)) {
-				statementIndex =
-						parseScenario(statements, statementIndex, referece, scenarios);
+				statementIndex = parseScenario(statements, statementIndex, reference, scenarios);
 			}
 		}
 
@@ -133,12 +121,11 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 				/**
 				 * ignore if line is empty or comment line
 				 */
-				if (!("".equalsIgnoreCase(strLine.trim())
-						|| COMMENT_CHARS.contains("" + strLine.trim().charAt(0)))) {
+				if (!("".equalsIgnoreCase(strLine.trim()) || COMMENT_CHARS.contains("" + strLine.trim().charAt(0)))) {
 					currLineBuffer.append((strLine.trim()));
 
 					// process single statement
-					Object[] cols = new Object[]{"", "", "", lineNo};
+					Object[] cols = new Object[] { "", "", "", lineNo };
 					String currLine = currLineBuffer.toString();
 					String type = getType(currLine);
 					if (type == "") {
@@ -166,16 +153,13 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 							Object[] scenario = rows.get(lastScenarioIndex);
 							scenario[0] = SCENARIO;
 
-							Map<Object, Object> metadata =
-									new Gson().fromJson((String) scenario[2], Map.class);
-							//scenario[2] = new Gson().toJson(metadata);
+							Map<Object, Object> metadata = new Gson().fromJson((String) scenario[2], Map.class);
+							// scenario[2] = new Gson().toJson(metadata);
 
 							String exampleMetadata = (String) cols[1];
 
-							if (StringUtil.isNotBlank(exampleMetadata)
-									&& exampleMetadata.trim().startsWith("{")) {
-								metadata.putAll(
-										new Gson().fromJson(exampleMetadata, Map.class));
+							if (StringUtil.isNotBlank(exampleMetadata) && exampleMetadata.trim().startsWith("{")) {
+								metadata.putAll(new Gson().fromJson(exampleMetadata, Map.class));
 								scenario[2] = new Gson().toJson(metadata);
 								currLineBuffer = new StringBuffer();
 								continue;
@@ -183,8 +167,7 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 
 						} else {
 							scenarioTags.addAll(globalTags);
-							String metadata = String.format("{\"groups\":%s}",
-									new Gson().toJson(scenarioTags));
+							String metadata = String.format("{\"groups\":%s}", new Gson().toJson(scenarioTags));
 							cols[2] = metadata;
 							scenarioTags.clear();
 							if (type.equalsIgnoreCase(FEATURE)) {
@@ -199,47 +182,46 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 
 					if (!examplesTable.isEmpty()) {
 						String lastStamtent = (String) rows.get(rows.size() - 1)[0];
-						int lastStatementIndex = lastStamtent.equalsIgnoreCase(EXAMPLES)
-								? lastScenarioIndex : (rows.size() - 1);
+						int lastStatementIndex = lastStamtent.equalsIgnoreCase(EXAMPLES) ? lastScenarioIndex
+								: (rows.size() - 1);
 						setExamples(rows.get(lastStatementIndex), examplesTable);
 						examplesTable.clear();
 						if (lastStamtent.equalsIgnoreCase(EXAMPLES)) {
 							rows.remove(rows.size() - 1);
 						}
 					}
-					
 
 					if (isBackground)
 						background.add(cols);
 					else {
 						rows.add(cols);
 						boolean scenarioStarted = StringUtil.indexOfIgnoreCase(type, SCENARIO) == 0;
-						
+
 						if (scenarioStarted) {
 							lastScenarioIndex = rows.size() - 1;
-								rows.addAll(background);
+							rows.addAll(background);
 						}
 					}
 					currLineBuffer = new StringBuffer();
 
-				} else if (StringUtil.isNotBlank(strLine)
-						&& strLine.trim().charAt(0) == '|') {
+				} else if (StringUtil.isNotBlank(strLine) && strLine.trim().charAt(0) == '|') {
 					addExample(strLine.trim(), examplesTable);
 				}
 			}
 
-			int lastStatementIndex =  rows.size() - 1;
-			String lastStamtent = (String) rows.get(lastStatementIndex)[0];
-			if (lastStamtent.equalsIgnoreCase(EXAMPLES)) {
-				rows.remove(lastStatementIndex);
-				lastStatementIndex =lastScenarioIndex;
+			if (!rows.isEmpty()) {
+				int lastStatementIndex = rows.size() - 1;
+				String lastStamtent = (String) rows.get(lastStatementIndex)[0];
+				if (lastStamtent.equalsIgnoreCase(EXAMPLES)) {
+					rows.remove(lastStatementIndex);
+					lastStatementIndex = lastScenarioIndex;
+				}
+				if (!examplesTable.isEmpty()) {
+					setExamples(rows.get(lastStatementIndex), examplesTable);
+					examplesTable.clear();
+				} 
 			}
-			
-			if (!examplesTable.isEmpty()) {
-				setExamples(rows.get(lastStatementIndex), examplesTable);
-				examplesTable.clear();
-			}
-			
+
 		} catch (Exception e) {
 			String strMsg = "Exception while reading BDD file: " + strFile + "#" + lineNo;
 			logger.error(strMsg + e);
@@ -256,7 +238,8 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 
 		}
 
-		rows.add(new Object[]{"END", "", "", lineNo+1});//indicate end of BDD
+		rows.add(new Object[] { "END", "", "", lineNo + 1 });// indicate end of
+																// BDD
 		return rows;
 	}
 
@@ -273,17 +256,22 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 			}
 
 			for (int i = 1; i < examplesTable.size(); i++) {
-				Map<String, Object> map = new HashMap<String, Object>();
+				Map<String, Object> map = new LinkedHashMap<String, Object>();
 				for (int k = 0; k < keys.size(); k++) {
-					map.put(keys.get(k), examplesTable.get(i).get(k).toString().trim());
+					Object val = examplesTable.get(i).get(k);
+					map.put(keys.get(k), null!=val?val.toString().trim():null);
 				}
 				dataMapList.add(map);
 			}
-			if (!isScenario && dataMapList.size() == 1) {
-				data = dataMapList.get(0); // case of map argument to statement
-			} else {
-				data = dataMapList;
-			}
+			// https://github.com/qmetry/qaf/issues/181
+			// map will be handled while processing parameters
+			// if (!isScenario && dataMapList.size() == 1) {
+			// data = dataMapList.get(0); // case of map argument to statement
+			// } else {
+			// data = dataMapList;
+			// }
+			data = dataMapList;
+
 		} else {
 			List<Object> res = new ArrayList<Object>();
 			for (List<Object> entry : examplesTable) {
@@ -295,8 +283,7 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 
 		if (isScenario) {
 			@SuppressWarnings("unchecked")
-			Map<Object, Object> metadata =
-					new Gson().fromJson((String) cols[2], Map.class);
+			Map<Object, Object> metadata = new Gson().fromJson((String) cols[2], Map.class);
 			metadata.put(params.JSON_DATA_TABLE.name(), new Gson().toJson(data));
 			cols[2] = new Gson().toJson(metadata);
 
@@ -306,22 +293,21 @@ public class GherkinFileParser extends AbstractScenarioFileParser {
 	}
 
 	private void addExample(String line, ArrayList<List<Object>> examplesTable) {
-		String[] rawData = StringUtil.parseCSV(line, '|');
+		Object[] rawData = StringUtil.parseCSV(line, '|');
 		ArrayList<Object> cols = new ArrayList<Object>();
 		for (int i = 1; i < rawData.length - 1; i++) {
 			// if (StringUtil.isBlank(rawData[i]) && (i == 0 || i ==
 			// rawData.length-1)) {
 			// continue;
 			// }
-			cols.add(rawData[i].trim());
+			cols.add(rawData[i]);
 		}
 		examplesTable.add(cols);
 	}
 
 	private String convertParam(String currLine) {
 
-		return StringUtil.replace(StringUtil.replace(currLine, ">", "}", -1), "<", "${",
-				-1);
+		return StringUtil.replace(StringUtil.replace(currLine, ">", "}", -1), "<", "${", -1);
 	}
 
 	private String getType(String line) {

@@ -1,41 +1,41 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.ui;
+
+import static com.qmetry.qaf.automation.ui.webdriver.ElementFactory.$;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.openqa.selenium.By;
-
+import com.qmetry.qaf.automation.ui.annotations.PageIdentifier;
+import com.qmetry.qaf.automation.ui.api.PageLocator;
 import com.qmetry.qaf.automation.ui.api.WebDriverTestPage;
 import com.qmetry.qaf.automation.ui.webdriver.ComponentFactory;
 import com.qmetry.qaf.automation.ui.webdriver.QAFExtendedWebDriver;
 import com.qmetry.qaf.automation.ui.webdriver.QAFExtendedWebElement;
 import com.qmetry.qaf.automation.ui.webdriver.QAFWebComponent;
 import com.qmetry.qaf.automation.ui.webdriver.QAFWebElement;
+import com.qmetry.qaf.automation.util.ClassUtil;
 
 /**
  * com.qmetry.qaf.automation.core.ui.WebDriverBaseTestPage.java
@@ -54,17 +54,21 @@ import com.qmetry.qaf.automation.ui.webdriver.QAFWebElement;
  */
 public abstract class WebDriverBaseTestPage<P extends WebDriverTestPage>
 		extends AbstractTestPage<P, QAFExtendedWebDriver> implements WebDriverTestPage {
+	
+	protected List<QAFWebElement> pageIdentifiers;
+
 	public WebDriverBaseTestPage() {
 		this(null);
 	}
 
 	public WebDriverBaseTestPage(P parent) {
 		super(new WebDriverTestBase(), parent);
+		pageIdentifiers = getPageIdentifiers();
 	}
 
 	@Override
 	public String getText() {
-		return driver.createElement(By.tagName("body")).getText();
+		return $("tagName=body").getText();
 	}
 
 	@Override
@@ -73,8 +77,21 @@ public abstract class WebDriverBaseTestPage<P extends WebDriverTestPage>
 	}
 
 	@Override
+	public boolean isPageActive(PageLocator loc, Object... args) {
+		for(QAFWebElement element:pageIdentifiers){
+			if(!element.isPresent())
+				return false;
+		}
+		return pageIdentifiers.size()>0;
+	}
+	
+	/**
+	 * This method should be called to wait for page load. It will wait for all element annotated with {@link PageIdentifier} to be present. 
+	 * Override this method to provide page specific custom wait implementation. 
+	 */
+	@Override
 	public void waitForPageToLoad() {
-
+		driver.waitForAllElementPresent(pageIdentifiers.toArray(new QAFWebElement[]{}));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -102,13 +119,32 @@ public abstract class WebDriverBaseTestPage<P extends WebDriverTestPage>
 		obj.getId();
 		return obj;
 	}
-	
+
 	@Override
 	public void waitForAjaxToComplete() {
 		getTestBase().getDriver().waitForAjax();
 	}
-	
+
 	public void waitForTextPresent(String text) {
-		new QAFExtendedWebElement(By.partialLinkText(text)).waitForPresent();
+		$("partialLinkText=text").waitForPresent();
+	}
+
+	private List<QAFWebElement> getPageIdentifiers() {
+		List<QAFWebElement> identifiers = new ArrayList<QAFWebElement>();
+
+		Field[] flds = ClassUtil.getAllFields(this.getClass(), WebDriverBaseTestPage.class);
+		for (Field fld : flds) {
+			if(fld.isAnnotationPresent(PageIdentifier.class) && QAFWebElement.class.isAssignableFrom(fld.getType())){
+				try {
+					fld.setAccessible(true);
+					identifiers.add((QAFWebElement) fld.get(this));
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				} catch (IllegalAccessException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return identifiers;
 	}
 }

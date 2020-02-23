@@ -1,27 +1,27 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.keys;
+
+import java.text.MessageFormat;
 
 import org.apache.commons.lang.StringUtils;
 import org.testng.IRetryAnalyzer;
@@ -31,9 +31,10 @@ import org.testng.ITestResult;
 import com.qmetry.qaf.automation.core.ConfigurationManager;
 import com.qmetry.qaf.automation.core.QAFListener;
 import com.qmetry.qaf.automation.data.BaseDataBean;
+import com.qmetry.qaf.automation.data.PasswordDecryptor;
+import com.qmetry.qaf.automation.http.UriProxySelector;
 import com.qmetry.qaf.automation.step.QAFTestStepListener;
 import com.qmetry.qaf.automation.ui.selenium.SeleniumCommandListener;
-import com.qmetry.qaf.automation.ui.selenium.WaitService;
 import com.qmetry.qaf.automation.ui.webdriver.QAFWebDriverCommandListener;
 import com.qmetry.qaf.automation.ui.webdriver.QAFWebElementCommandListener;
 import com.qmetry.qaf.automation.ws.rest.RestClientFactory;
@@ -74,7 +75,7 @@ public enum ApplicationProperties {
 	FAILURE_SCREENSHOT("selenium.failure.screenshots"),
 	/**
 	 * <b>key</b>: <code>selenium.wait.timeout </code><br/>
-	 * <b>value</b>: wait time to be used by {@link WaitService}
+	 * <b>value</b>: default wait time to be used by framework by wait/assert/verify methods
 	 */
 	SELENIUM_WAIT_TIMEOUT("selenium.wait.timeout"),
 	/**
@@ -528,7 +529,132 @@ public enum ApplicationProperties {
 	 *        <b>value</b>: full qualified name of the class that extends
 	 *        {@link RestClientFactory}.
 	 */
-	REST_CLIENT_FACTORY_IMPL("rest.client.impl");
+	REST_CLIENT_FACTORY_IMPL("rest.client.impl"),
+
+	/**
+	 * @since 2.1.13 <b>key</b>: <code>password.decryptor.impl</code><br/>
+	 *        <b>value</b>: full qualified name of the class that implements
+	 *        {@link PasswordDecryptor}. This implementation will be used to
+	 *        decrypt password. When configuration manager found any key starts
+	 *        with {@link #ENCRYPTED_PASSWORD_KEY_PREFIX}
+	 */
+	PASSWORD_DECRYPTOR_IMPL("password.decryptor.impl"),
+
+	/**
+	 * <b>key</b>: <code>encrypted</code><br/>
+	 * <b>value</b>: property with prefix 'encrypted'. When configuration
+	 * manager found any key starts with 'encrypted' prefix, for example
+	 * 'encripted.db.pwd', then it will store decrypted value without prefix,
+	 * 'db.pwd' in this example. So you can reference decrypted value anywhere
+	 * in the code with key without this prefix ('db.pwd' in this example).
+	 * 
+	 * @since 2.1.13
+	 */
+	ENCRYPTED_PASSWORD_KEY_PREFIX("encrypted."),
+	/**
+	 * <p>
+	 * To set default meta-data for all element. Meta-data provided with locator
+	 * has higher preference than default values.
+	 * </p>
+	 * <b>key</b>: <code>element.default.metadata</code><br/>
+	 * <b>value</b>: JSON map of meta data to be set as default for element.
+	 * 
+	 * @since 2.1.13
+	 * 
+	 */
+	ELEMENT_GLOBAL_METADATA("element.default.metadata"),
+	/**
+	 * <p>
+	 * Specify weather to attach default element listener or not.
+	 * </p>
+	 * <b>key</b>: <code>element.default.listener</code><br/>
+	 * <b>value</b>: boolean true/false.
+	 * 
+	 * @since 2.1.13
+	 * 
+	 */
+	ELEMENT_ATTACH_DEFAULT_LISTENER("element.default.listener"),
+	/**
+	 * <p>
+	 * Set true to trust all certificates and ignore host name verification for
+	 * web-services.
+	 * </p>
+	 * <b>key</b>: <code>https.accept.all.cert</code><br/>
+	 * <b>value</b>: boolean true/false.
+	 * 
+	 * @since 2.1.13
+	 * 
+	 */
+	HTTPS_ACCEPT_ALL_CERT("https.accept.all.cert"),
+
+	/**
+	 * <p>
+	 * Set test case identifier meta-key which will be used to as file name of
+	 * test case result json file.
+	 * </p>
+	 * <b>key</b>: <code>tc.identifier.key</code><br/>
+	 * <b>value</b>: String test-case meta-key.
+	 * 
+	 * @since 2.1.13
+	 * 
+	 */
+	TESTCASE_IDENTIFIER_KEY("tc.identifier.key"),
+	/**
+	 * <p>
+	 * Set proxy server that needs to used by {@link UriProxySelector}
+	 * </p>
+	 * <b>key</b>: <code>proxy.server</code><br/>
+	 * <b>value</b>: proxy server.
+	 * 
+	 * @since 2.1.14
+	 * 
+	 */
+	PROXY_SERVER_KEY("proxy.server"),
+	/**
+	 * <p>
+	 * Set proxy server port that needs to used by {@link UriProxySelector}.
+	 * Default value is 80.
+	 * </p>
+	 * <b>key</b>: <code>proxy.port</code><br/>
+	 * <b>value</b>: integer port of running proxy server.
+	 * 
+	 * @since 2.1.14
+	 * 
+	 */
+	PROXY_PORT_KEY("proxy.port"),
+	/**
+	 * <p>
+	 * Set one or more host url that needs to be proxied through given proxy server.
+	 * </p>
+	 * <b>key</b>: <code>host.to.proxy</code><br/>
+	 * <b>value</b>: one or more host URL separated by ';'
+	 * 
+	 * @since 2.1.14
+	 * 
+	 */
+	PROXY_HOSTS_KEY("host.to.proxy"),
+	/**
+	 * <p>
+	 * Set list of meta-data rule to be applied on meta-data during dryrun.
+	 * </p>
+	 * <b>key</b>: <code>metadata.rules</code><br/>
+	 * <b>value</b>: Json format List of {@link MetaDataRule}
+	 * 
+	 * @since 2.1.15
+	 * 
+	 */
+	METADATA_RULES("metadata.rules"),
+	/**
+	 * <p>
+	 * Set format as supported by {@link MessageFormat} that accepts one argument.
+	 * </p>
+	 * <b>key</b>: <code>metadata.formatter</code><br/>
+	 * <b>value</b>: format to apply on meta-value
+	 * 
+	 * @since 2.1.15
+	 * 
+	 */
+	METADATA_FORMTTOR_PREFIX("metadata.formatter");
 
 	public String key;
 

@@ -1,36 +1,38 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to
- * author
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven
- * approach
- * Copyright 2016 Infostretch Corporation
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or any later version.
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE
- * You should have received a copy of the GNU General Public License along with
- * this program in the name of LICENSE.txt in the root folder of the
- * distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- * See the NOTICE.TXT file in root folder of this source files distribution
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- * For any inquiry or need additional information, please contact
- * support-qaf@infostretch.com
- *******************************************************************************/
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.step;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.hamcrest.Matchers;
 import org.testng.annotations.Test;
 
+import com.google.gson.Gson;
 import com.qmetry.qaf.automation.core.ConfigurationManager;
+import com.qmetry.qaf.automation.step.BDDStepMatcherFactory.GherkinStepMatcher;
+import com.qmetry.qaf.automation.util.JSONUtil;
+import com.qmetry.qaf.automation.util.Validator;
 
 public class TestStepTest {
 
@@ -60,9 +62,47 @@ public class TestStepTest {
 //		StringTestStep.execute("comment", new Object[]{"aaahjg", " kjhkjh"});
 //
 //		StringTestStep.execute("comment");
+	}
+	@SuppressWarnings("unchecked")
+	@Test(description = "cucumber step with object arg from test data", enabled=true)
+	public void bug321() {
+		
+		ConfigurationManager.getBundle().setProperty("step.provider.pkg", "com.qmetry.qaf.automation.impl.step");
+		String json =" {\r\n" + 
+				"    \"nestedObject\": {\r\n" + 
+				"      \"keyName\": \"SOME TEXT WITH BLANK SPACES\"	  \r\n" + 
+				"    }\r\n" + 
+				"  }";
+		
+		GherkinStepMatcher m = new GherkinStepMatcher();
+		
+		Map<String, Object> context = new HashMap<String, Object>();
+		context.put("nestedObject", JSONUtil.toObject(json));
+		boolean found = m.matches("^I parse nested object ((?:\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)\")|(?:'([^'\\\\]*(\\\\.[^'\\\\]*)*)'))$", "I parse nested object \"${nestedObject}\"", context);
+		System.out.println(found);
+		List<String[]> args = m.getArgsFromCall("^I parse nested object \"([^\"]*)\"$", "I parse nested object \"${nestedObject}\"", context);
+		System.out.println(JSONUtil.toString(args));
+		//^I have ((?:-?\d+)|(?:\d+)) cukes in my ((?:"([^"\\]*(\\.[^"\\]*)*)")|(?:'([^'\\]*(\\.[^'\\]*)*)'))s
+		//args = m.getArgsFromCall("^I have ((?:-?\\d+)|(?:\\d+)) cukes in my ((?:\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)\")|(?:'([^'\\\\]*(\\\\.[^'\\\\]*)*)'))s", "I have 10 cukes in my \"bag\"s", context);
+		//System.out.println(JSONUtil.toString(args));
+		ConfigurationManager.getBundle().setProperty("nestedObject",  new Gson().fromJson(json,Object.class));
+		Object res = StringTestStep.execute("I parse nested object \"${nestedObject}\"");
+		Validator.assertThat(res, Matchers.instanceOf(Map.class));
+		Validator.assertThat(((Map<String, Object>)res).get("nestedObject"), Matchers.instanceOf(Map.class));
+		
+		System.out.println(JSONUtil.toString(res));
 
 	}
+	
+	@Test(description = "Step with partial escap")
+	public void issue320() {
+		ConfigurationManager.getBundle().setProperty("step.provider.pkg", "com.qmetry.qaf.automation.impl.step");
 
+		Object res = StringTestStep.execute("test value(s) 'somevalue' with {esc}", new Object[]{});
+
+		Validator.verifyThat("result " + res,
+				res, Matchers.is("somevalue"));
+	}
 	@Test(description = "Method not annotted with QAFTestStep in class which is not step provider", expectedExceptions = RuntimeException.class)
 	public void stepExecuterTest2() {
 		StringTestStep.execute("normalMethod");
@@ -77,6 +117,34 @@ public class TestStepTest {
 
 	}
 	
+	@Test(description = "Auto parse List of complex objects in step argument")
+	public void feature303() {
+		ConfigurationManager.getBundle().setProperty("step.provider.pkg", "com.qmetry.qaf.automation.impl.step");
+
+		StringTestStep.execute("And I have set of:[{\"name\":\"item-1\"},{\"name\":\"item-2\"}]", new Object[]{});
+
+		StringTestStep.execute("And I have set of:[\"name\",\"item,-1\",\"item-2\"]", new Object[]{});
+		
+		StringTestStep.execute("And I have set of:{\"name\":\"<item,-1>\"}", new Object[]{});
+		StringTestStep.execute("I see following colors:\"RED\"", new Object[]{});
+		StringTestStep.execute("I see following colors:[\"GREEN\"]", new Object[]{});
+		StringTestStep.execute("I see following colors:[\"R,ED\",\"GREEN\"]", new Object[]{});
+	}
+	
+	@SuppressWarnings({"unchecked"})
+	@Test(description = "Bdd Step call with Map argument removes entry with null value from map argument")
+	public void bug315() {
+		ConfigurationManager.getBundle().setProperty("step.provider.pkg", "com.qmetry.qaf.automation.impl.step");
+
+		String json = "{'l':1,'a':null}";
+
+		Map<String, Object> o = JSONUtil.toObject(json, Map.class);
+		Validator.assertThat("map should have key 'a'" + o, o, Matchers.hasEntry("a",null));
+		System.out.println(o);
+
+		o = (Map<String, Object>) StringTestStep.execute("testArguments", new Object[] {o});
+		Validator.assertThat("map should have key 'a'" + o, o, Matchers.hasKey("a"));
+	}
 
 	@Test(description = "")
 	public void testStepFromClassExtendingAnotherClass() {

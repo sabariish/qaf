@@ -1,32 +1,24 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to
- * author
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven
- * approach
- * Copyright 2016 Infostretch Corporation
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or any later version.
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE
- * You should have received a copy of the GNU General Public License along with
- * this program in the name of LICENSE.txt in the root folder of the
- * distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- * See the NOTICE.TXT file in root folder of this source files distribution
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- * For any inquiry or need additional information, please contact
- * support-qaf@infostretch.com
- *******************************************************************************/
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.util;
 
 import java.io.File;
@@ -53,6 +45,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+
+import org.apache.commons.lang.ClassUtils;
 
 /**
  * com.qmetry.qaf.automation.util.ClassUtil.java
@@ -82,6 +76,11 @@ public final class ClassUtil {
 	public static Set<Method> getAllMethodsWithAnnotation(Class<?> cls, Class<? extends Annotation> annotation) {
 		Set<Method> methods = new HashSet<Method>();
 		try {
+			for (Method method : cls.getDeclaredMethods()) {
+				if (hasAnnotation(method, annotation)) {
+					methods.add(method);
+				}
+			}
 			for (Method method : cls.getMethods()) {
 				if (hasAnnotation(method, annotation)) {
 					methods.add(method);
@@ -196,8 +195,7 @@ public final class ClassUtil {
 	}
 
 	/**
-	 * Recursive method used to find all classes in a given directory and
-	 * subdirs.
+	 * Recursive method used to find all classes in a given directory and subdirs.
 	 * 
 	 * @param directory
 	 *            The base directory
@@ -249,13 +247,12 @@ public final class ClassUtil {
 	}
 
 	/**
-	 * Get all fields of the class including parent up to given level in
-	 * hierarchy.
+	 * Get all fields of the class including parent up to given level in hierarchy.
 	 * 
 	 * @param clazz
 	 * @param uptoParent
-	 *            - restrict hierarchy - to exclude fields from provided class
-	 *            and it's parent(s) in hierarchy
+	 *            - restrict hierarchy - to exclude fields from provided class and
+	 *            it's parent(s) in hierarchy
 	 * @return
 	 */
 	public static Field[] getAllFields(Class<?> clazz, Class<?> uptoParent) {
@@ -277,8 +274,8 @@ public final class ClassUtil {
 	}
 
 	/**
-	 * Get instance of Parameterized class by calling default constructor. Will
-	 * work only if Parameterized class has default constructor
+	 * Get instance of Parameterized class by calling default constructor. Will work
+	 * only if Parameterized class has default constructor
 	 * 
 	 * @param <C>
 	 * @return instance of the parameter
@@ -387,9 +384,9 @@ public final class ClassUtil {
 	}
 
 	/**
-	 * Given an interface Method, look in the implementing class for the method
-	 * that implements the interface's method to obtain generic type
-	 * information. This is useful for templatized interfaces like:
+	 * Given an interface Method, look in the implementing class for the method that
+	 * implements the interface's method to obtain generic type information. This is
+	 * useful for templatized interfaces like:
 	 * <p/>
 	 * 
 	 * <pre>
@@ -419,9 +416,9 @@ public final class ClassUtil {
 	}
 
 	/**
-	 * Given an interface Method, look in the implementing class for the method
-	 * that implements the interface's method to obtain generic type
-	 * information. This is useful for templatized interfaces like:
+	 * Given an interface Method, look in the implementing class for the method that
+	 * implements the interface's method to obtain generic type information. This is
+	 * useful for templatized interfaces like:
 	 * <p/>
 	 * 
 	 * <pre>
@@ -557,8 +554,7 @@ public final class ClassUtil {
 
 	/**
 	 * Finds an actual value of a type variable. The method looks in a class
-	 * hierarchy for a class defining the variable and returns the value if
-	 * present.
+	 * hierarchy for a class defining the variable and returns the value if present.
 	 * 
 	 * @param clazz
 	 * @param typevariable
@@ -597,19 +593,7 @@ public final class ClassUtil {
 
 	public static void setField(String fieldName, Object classObj, Object value) {
 		try {
-
-			Field field = null;
-			try {
-				field = classObj.getClass().getField(fieldName);
-			} catch (NoSuchFieldException e) {
-				Field[] fields = ClassUtil.getAllFields(classObj.getClass(), Object.class);
-				for (Field f : fields) {
-					if (f.getName().equalsIgnoreCase(fieldName)) {
-						field = f;
-						break;
-					}
-				}
-			}
+			Field field = getField(fieldName, classObj.getClass());
 
 			field.setAccessible(true);
 			Field modifiersField = Field.class.getDeclaredField("modifiers");
@@ -619,7 +603,31 @@ public final class ClassUtil {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
 
+	public static Field getField(String fieldName, Class<?> clazz) throws NoSuchFieldException {
+		try {
+			return clazz.getField(fieldName);
+		} catch (NoSuchFieldException e) {
+			Field[] fields = ClassUtil.getAllFields(clazz, Object.class);
+			for (Field f : fields) {
+				if (f.getName().equalsIgnoreCase(fieldName)) {
+					return f;
+				}
+			}
+			throw e;
+		}
+	}
+
+	public static Object getField(String fieldName, Object classObj) {
+		try {
+			Field field = getField(fieldName, classObj.getClass());
+			field.setAccessible(true);
+			return field.get(classObj);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	private static Type getTypeVariableViaGenericInterface(Class<?> clazz, Class<?> classDeclaringTypevariable,
@@ -649,8 +657,8 @@ public final class ClassUtil {
 
 	/**
 	 * @param clazz
-	 * @return return true if it is any of the wrapper class (i.e. Double, Long)
-	 *         or String or Void
+	 * @return return true if it is any of the wrapper class (i.e. Double, Long) or
+	 *         String or Void
 	 */
 	public static boolean isWrapperType(Class<?> clazz) {
 		return WRAPPER_TYPES.contains(clazz);
@@ -658,6 +666,26 @@ public final class ClassUtil {
 
 	public static boolean isPrimitiveOrWrapperType(Class<?> clazz) {
 		return clazz.isPrimitive() || isWrapperType(clazz);
+
+	}
+
+	public static boolean isAssignableFrom(Type typeOfT, Class<?> clazz) {
+		Class<?> cls = getClass(typeOfT);
+		return clazz.isAssignableFrom(cls);
+	}
+
+	public static Class<?> getClass(Type typeOfT) {
+		if (typeOfT instanceof ParameterizedType) {
+			return getClass(((ParameterizedType) typeOfT).getRawType());
+		}
+		if (typeOfT instanceof Class) {
+			return (Class<?>) typeOfT;
+		}
+		try {
+			return ClassUtils.getClass(typeOfT.getTypeName());
+		} catch (ClassNotFoundException e) {
+			return typeOfT.getClass();
+		}
 
 	}
 

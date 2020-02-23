@@ -1,27 +1,24 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.data;
 
 import static com.qmetry.qaf.automation.core.ConfigurationManager.getBundle;
@@ -53,14 +50,14 @@ import org.testng.SkipException;
 
 import com.qmetry.qaf.automation.keys.ApplicationProperties;
 import com.qmetry.qaf.automation.testng.RetryAnalyzer;
-import com.qmetry.qaf.automation.testng.pro.DataProviderUtil;
+import com.qmetry.qaf.automation.testng.dataprovider.DataProviderUtil;
 import com.qmetry.qaf.automation.util.ClassUtil;
 import com.qmetry.qaf.automation.util.DatabaseUtil;
 import com.qmetry.qaf.automation.util.DateUtil;
 import com.qmetry.qaf.automation.util.JSONUtil;
+import com.qmetry.qaf.automation.util.RandomStringGenerator.RandomizerTypes;
 import com.qmetry.qaf.automation.util.Randomizer;
 import com.qmetry.qaf.automation.util.StringUtil;
-import com.qmetry.qaf.automation.util.RandomStringGenerator.RandomizerTypes;
 
 /**
  * com.qmetry.qaf.automation.data.BaseDataBean.java
@@ -90,7 +87,7 @@ public abstract class BaseDataBean implements DataBean {
 	@SuppressWarnings("unchecked")
 	public void fillData(Object obj) {
 		if (obj instanceof Map) {
-			fillData((Map<String, String>) obj);
+			fillData((Map<String, Object>) obj);
 			return;
 		}
 		if (obj instanceof String) {
@@ -132,7 +129,7 @@ public abstract class BaseDataBean implements DataBean {
 			JSONObject jsonObject = new JSONObject(jsonstr);
 			String[] keys = JSONObject.getNames(jsonObject);
 			for (String key : keys) {
-				fillData(key, jsonObject.getString(key));
+				fillData(key, jsonObject.optString(key));
 			}
 		} catch (JSONException e) {
 			logger.error(e);
@@ -146,7 +143,7 @@ public abstract class BaseDataBean implements DataBean {
 	 * @param datakey
 	 */
 	public void fillFromConfig(String datakey) {
-		List<Object[]> set = DataProviderUtil.getDataSetAsMap(datakey);
+		List<Object[]> set = DataProviderUtil.getDataSetAsMap(datakey,"");
 		if (set.isEmpty()) {
 			return;
 		}
@@ -232,7 +229,7 @@ public abstract class BaseDataBean implements DataBean {
 	 *            example if bean property is "firstName" map should contain
 	 *            entry with key "FIRSTNAME" (case insensitive)
 	 */
-	public void fillData(Map<String, String> map) {
+	public void fillData(Map<String, Object> map) {
 		for (String key : map.keySet()) {
 			fillData(key, String.valueOf(map.get(key)));
 		}
@@ -250,7 +247,7 @@ public abstract class BaseDataBean implements DataBean {
 	 */
 	@SuppressWarnings("unchecked")
 	public void fillDataFromDB(String query) {
-		fillData(((Map<String, String>) DatabaseUtil.getRecordDataAsMap(query)[0][0]));
+		fillData(((Map<String, Object>) DatabaseUtil.getRecordDataAsMap(query)[0][0]));
 	}
 
 	/**

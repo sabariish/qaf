@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!-- 
- QMetry Automation Framework provides a powerful and versatile platform to author 
-Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
-               
-Copyright 2016 Infostretch Corporation
 
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
+Copyright (c) 2019 Infostretch Corporation
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
-OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
-
-See the NOTICE.TXT file in root folder of this source files distribution 
-for additional information regarding copyright ownership and licenses
-of other open source software / files used by QMetry Automation Framework.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 For any inquiry or need additional information, please contact support-qaf@infostretch.com
 
@@ -37,8 +39,8 @@ For any inquiry or need additional information, please contact support-qaf@infos
 	<property name="test.src.dir" value="${test.dir}/src" />
 	<property name="meta.dir" value="${basedir}/META-INF" />
 	<property name="debuglevel" value="source,lines,vars" />
-	<property name="target" value="1.7" />
-	<property name="source" value="1.7" />
+	<property name="target" value="1.8" />
+	<property name="source" value="1.8" />
 	<property file="build.properties" />
 
 	<path id="build.classpath">
@@ -61,7 +63,7 @@ For any inquiry or need additional information, please contact support-qaf@infos
 		<!-- download Ivy from web site so that it can be used even without any 
 			special installation -->
 		<echo message="installing ivy..." />
-		<get src="http://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar" dest="${ivy.jar.file}" usetimestamp="true" />
+		<get src="https://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar" dest="${ivy.jar.file}" usetimestamp="true" />
 	</target>
 	<!-- ================================= target: install-ivy this target is 
 		not necessary if you put ivy.jar in your ant lib directory if you already 
@@ -126,7 +128,7 @@ For any inquiry or need additional information, please contact support-qaf@infos
 		<echo level="info">--- compile (finished) ---</echo>
 	</target>
 	<!-- ================================= target: build ================================= -->
-	<target name="build" depends="make-jar, build-cucumber-report, gendoc,gensource, make-standalone-jar" description="build framework, generate docs">
+	<target name="build" depends="make-jar, gendoc,gensource" description="build framework, generate docs">
 
 
 	</target>
@@ -208,27 +210,7 @@ For any inquiry or need additional information, please contact support-qaf@infos
 	</manifest>
 </jar>
 </target>
-<target name="build-cucumber-report" depends="clean, compile" description="build basic version">
-<mkdir dir="${dist.dir}" />
-<!-- basic -->
 
-<jar destfile="${dist.dir}/qaf-cucumber-${version-num}.${build-num}.jar" basedir="${bin.dir}" includes="**/report/**,**/cucumber/**,**/core/**, **/keys/**,**/automation/util/**">
-	<metainf dir="." includes="LICENSE.txt,NOTICE.txt" />
-	<manifest>
-		<attribute name="Vendor" value="Infostretch Corp." />
-		<attribute name="Built-By" value="${user.name}" />
-
-		<section name="Build-Info">
-			<attribute name="qaf-Build-Time" value="${build.timestamp}" />
-
-			<!-- Information about the program itself -->
-			<attribute name="qaf-Version" value="${version-num}" />
-			<attribute name="qaf-Revision" value="${build-num}" />
-			<attribute name="qaf-Type" value="cucumber-reporting-plugin" />
-		</section>
-	</manifest>
-</jar>
-</target>
 <target name="publish" depends="init">
 <!-- Determine build number from previously published revisions -->
 <ivy:buildnumber resolver="local-m2-publish" organisation="${ivy.organisation}" module="${ivy.module}" revision="${release.num}" />
@@ -245,17 +227,33 @@ For any inquiry or need additional information, please contact support-qaf@infos
 <!-- Publish the local repo. Defaults to ~/.ivy2/local -->
 <ivy:publish resolver="local-m2-publish" forcedeliver="true" publishivy="true" pubrevision="${release.num}" overwrite="true">
 	<artifacts pattern="${dist.dir}/[artifact].[ext]" />
-	<artifact name="qaf-standalone" pattern="${dist.dir}/[artifact].[ext]" ext="jar" classifier="standalone" type="standalone" version="${release.num}" />
+	<!--<artifact name="qaf-standalone" pattern="${dist.dir}/[artifact].[ext]" ext="jar" classifier="standalone" type="standalone" version="${release.num}" /> -->
 	<artifact name="qaf" pattern="${dist.dir}/[artifact].[ext]" ext="pom" type="pom" version="${release.num}" />
 	<artifact name="qaf-sources" pattern="${dist.dir}/[artifact].[ext]" ext="jar" classifier="sources" type="sources" version="${release.num}" />
 	<artifact name="qaf-javadoc" pattern="${dist.dir}/[artifact].[ext]" ext="jar" classifier="javadoc" type="javadoc" version="${release.num}" />
 </ivy:publish>
 </target>
 
-<target name="ivy-publish-share" depends="make-jar" description="publish jar/source to maven repo mounted at ~/repo">
-<ivy:publish resolver="share-m2" forcedeliver="true" overwrite="true" publishivy="false">
-	<artifacts pattern="${dist.dir}/[artifact].[ext]" />
-</ivy:publish>
+<target name="ivy-publish-share" description="publish jar/source to maven repo mounted at ~/repo" depends="init">
+	<!-- Determine build number from previously published revisions -->
+	<ivy:buildnumber resolver="${publish.resolver}" organisation="${ivy.organisation}" module="${ivy.module}" revision="${release.num}" />
+
+	<!-- Resolve ivy dependencies and create a Maven POM file -->
+	<ivy:deliver deliverpattern="${dist.dir}/ivy.xml" pubrevision="${release.num}" status="${status}" />
+	<ivy:makepom ivyfile="${dist.dir}/ivy.xml" pomfile="${dist.dir}/${artifact.name}.pom" templatefile="pom.tmpl" >
+		<mapping conf="compile" scope="compile" />
+		<mapping conf="runtime" scope="runtime" />
+		<mapping conf="test" scope="test" />
+		<mapping conf="provided" scope="provided" />
+	</ivy:makepom>
+
+	<!-- Publish the local repo. Defaults to ~/.ivy2/local -->
+	<ivy:publish resolver="${publish.resolver}" forcedeliver="true" publishivy="false" pubrevision="${release.num}" overwrite="true" status="${status}">
+		<artifacts pattern="${dist.dir}/[artifact](-[classifier]).[ext]" />
+		<artifact name="${artifact.name}" pattern="${dist.dir}/[artifact].[ext]" ext="pom" type="pom" version="${release.num}" />
+		<artifact name="${artifact.name}" pattern="${dist.dir}/[artifact].[ext]" ext="jar" classifier="sources" type="sources" version="${release.num}" />
+		<artifact name="${artifact.name}" pattern="${dist.dir}/[artifact].[ext]" ext="jar" classifier="javadoc" type="javadoc" version="${release.num}" />
+	</ivy:publish>
 </target>
 
 <target name="test-compile" depends="init">
@@ -273,7 +271,7 @@ For any inquiry or need additional information, please contact support-qaf@infos
 </iajc>
 <echo level="info">--- test compile (finished) ---</echo>
 </target>
-<target name="test" depends="make-jar, test-compile">
+<target name="test" depends="build, test-compile">
 <taskdef resource="testngtasks" classpathref="test.classpath" />
 <testng classpathref="test.classpath" workingDir="${test.dir}" outputDir="${test.dir}/test-results" haltOnFailure="true" verbose="2">
 	<classpath location="${bin.dir}" />

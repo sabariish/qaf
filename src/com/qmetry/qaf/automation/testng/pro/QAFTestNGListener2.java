@@ -1,31 +1,27 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to author 
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven approach
- *                
- * Copyright 2016 Infostretch Corporation
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
- *
- * You should have received a copy of the GNU General Public License along with this program in the name of LICENSE.txt in the root folder of the distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- *
- * See the NOTICE.TXT file in root folder of this source files distribution 
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- *
- * For any inquiry or need additional information, please contact support-qaf@infostretch.com
- *******************************************************************************/
-
-
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.testng.pro;
 
 import static com.qmetry.qaf.automation.core.ConfigurationManager.getBundle;
-import static com.qmetry.qaf.automation.testng.dataprovider.DataProviderFactory.getDataProvider;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -42,6 +38,7 @@ import org.testng.ISuite;
 import org.testng.ITestContext;
 import org.testng.ITestResult;
 import org.testng.annotations.ITestAnnotation;
+import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 import org.testng.internal.ConstructorOrMethod;
 
@@ -55,7 +52,7 @@ import com.qmetry.qaf.automation.integration.TestCaseRunResult;
 import com.qmetry.qaf.automation.keys.ApplicationProperties;
 import com.qmetry.qaf.automation.step.client.TestNGScenario;
 import com.qmetry.qaf.automation.testng.RetryAnalyzer;
-import com.qmetry.qaf.automation.testng.dataprovider.QAFDataProvider;
+import com.qmetry.qaf.automation.testng.dataprovider.DataProviderUtil;
 import com.qmetry.qaf.automation.testng.report.ReporterUtil;
 import com.qmetry.qaf.automation.util.ClassUtil;
 import com.qmetry.qaf.automation.util.StringUtil;
@@ -100,12 +97,18 @@ public class QAFTestNGListener2 extends QAFTestNGListener
 		logger.debug("onFinish: done");
 
 	}
-
+	@Override
+	public void onStart(ITestContext testContext) {
+		super.onStart(testContext);
+		if (!skipReporting()){
+			ReporterUtil.updateOverview(testContext, null);
+		}
+	}
 	@Override
 	public void onFinish(ITestContext testContext) {
 		if (skipReporting())
 			return;
-		
+
 		super.onFinish(testContext);
 		ReporterUtil.updateOverview(testContext, null);
 	}
@@ -113,16 +116,11 @@ public class QAFTestNGListener2 extends QAFTestNGListener
 	@SuppressWarnings("rawtypes")
 	public void transform(ITestAnnotation testAnnotation, Class clazz, Constructor arg2, Method method) {
 		try {
-			if ((method.getAnnotation(QAFDataProvider.class) != null) && (null != method.getParameterTypes())
-					&& (null != method) && (method.getParameterTypes().length > 0)) {
-				String dp = getDataProvider(method);
-				if (StringUtil.isNotBlank(dp)) {
-					testAnnotation.setDataProvider(dp);
-					testAnnotation.setDataProviderClass(DataProviderUtil.class);
-				}
-			}
-
 			if (null != method) {
+				if (null != method.getParameterTypes()
+						&& (method.getParameterTypes().length > 0) && !method.isAnnotationPresent(Parameters.class)) {
+					DataProviderUtil.setQAFDataProvider(testAnnotation, method);
+				}
 
 				String tmtURL = getBundle().getString(method.getName() + ".testspec.url");
 				if (StringUtil.isNotBlank(tmtURL)) {
@@ -208,11 +206,11 @@ public class QAFTestNGListener2 extends QAFTestNGListener
 					Class<?> updatorCls = Class.forName(updator);
 
 					TestCaseResultUpdator updatorObj = (TestCaseResultUpdator) updatorCls.newInstance();
-				    
+
 					TestNGScenario scenario = (TestNGScenario) tr.getMethod();
 					Map<String, Object> params = new HashMap<String, Object>(scenario.getMetaData());
 					params.put("duration", tr.getEndMillis() - tr.getStartMillis());
-						    
+
 					ResultUpdator.updateResult(result, stb.getHTMLFormattedLog() + stb.getAssertionsLog(), updatorObj,
 							params);
 				}
@@ -224,7 +222,8 @@ public class QAFTestNGListener2 extends QAFTestNGListener
 
 	}
 
-	private boolean skipReporting(){
-		return getBundle().getBoolean("disable.qaf.testng.reporter",false) || getBundle().getBoolean("cucumber.run.mode",false);
+	private boolean skipReporting() {
+		return getBundle().getBoolean("disable.qaf.testng.reporter", false)
+				|| getBundle().getBoolean("cucumber.run.mode", false);
 	}
 }

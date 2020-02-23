@@ -1,42 +1,34 @@
 /*******************************************************************************
- * QMetry Automation Framework provides a powerful and versatile platform to
- * author
- * Automated Test Cases in Behavior Driven, Keyword Driven or Code Driven
- * approach
- * Copyright 2016 Infostretch Corporation
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or any later version.
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT
- * OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE
- * You should have received a copy of the GNU General Public License along with
- * this program in the name of LICENSE.txt in the root folder of the
- * distribution. If not, see https://opensource.org/licenses/gpl-3.0.html
- * See the NOTICE.TXT file in root folder of this source files distribution
- * for additional information regarding copyright ownership and licenses
- * of other open source software / files used by QMetry Automation Framework.
- * For any inquiry or need additional information, please contact
- * support-qaf@infostretch.com
- *******************************************************************************/
+ * Copyright (c) 2019 Infostretch Corporation
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 package com.qmetry.qaf.automation.step;
 
-import static com.qmetry.qaf.automation.core.ConfigurationManager.getBundle;
+import static com.qmetry.qaf.automation.step.client.text.BDDDefinitionHelper.quoteParams;
+import static com.qmetry.qaf.automation.step.client.text.BDDDefinitionHelper.replaceParams;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.apache.commons.lang.text.StrSubstitutor;
 
 import com.qmetry.qaf.automation.step.client.text.BDDDefinitionHelper;
 import com.qmetry.qaf.automation.step.client.text.BDDDefinitionHelper.ParamType;
@@ -58,14 +50,26 @@ public class BDDStepMatcherFactory {
 
 		@Override
 		public boolean matches(String stepDescription, String stepCall, Map<String, Object> context) {
-			stepCall = BDDDefinitionHelper.quoteParams(stepCall);
+			stepDescription=fixEsc(stepDescription);
+			stepCall = replaceParams(stepCall, context);
+
+			stepCall = quoteParams(stepCall);
 			return BDDDefinitionHelper.matches(stepDescription, stepCall);
 		}
 
 		@Override
 		public List<String[]> getArgsFromCall(String stepDescription, String stepCall, Map<String, Object> context) {
-			stepCall = BDDDefinitionHelper.quoteParams(stepCall);
+			stepDescription=fixEsc(stepDescription);
+			stepCall = replaceParams(stepCall, context);
+			stepCall = quoteParams(stepCall);
 			return BDDDefinitionHelper.getArgsFromCall(stepDescription, stepCall);
+		}
+		private static String fixEsc(String s) {
+			Pattern p1 = Pattern.compile("\\\\\\((.*?)\\)");
+			Pattern p2 = Pattern.compile("\\\\\\{(.*?)\\}");
+			s = p1.matcher(s).replaceAll("\\\\\\($1\\\\\\)");
+			s = p2.matcher(s).replaceAll("\\\\\\{$1\\\\\\}");
+			return s;
 		}
 
 	}
@@ -82,6 +86,7 @@ public class BDDStepMatcherFactory {
 		public List<String[]> getArgsFromCall(String stepDescription, String stepCall, Map<String, Object> context) {
 			List<String[]> args = new ArrayList<String[]>();
 			stepCall = replaceParams(stepCall, context);
+			//stepCall = quoteParams(stepCall);
 			Matcher matcher = getMatcher(stepDescription, stepCall);
 			while (matcher.find()) {
 				for (int i = 1; i <= matcher.groupCount(); i++) {
@@ -91,13 +96,6 @@ public class BDDStepMatcherFactory {
 			}
 			return args;
 		}
-
-		private String replaceParams(String stepCall, Map<String, Object> context) {
-			stepCall = StrSubstitutor.replace(stepCall, context);
-			stepCall = getBundle().getSubstitutor().replace(stepCall);
-			return stepCall;
-		}
-
 		private Matcher getMatcher(String stepDescription, String stepName) {
 			Pattern pattern = getPattern(opArgs(stepDescription));
 
@@ -132,5 +130,5 @@ public class BDDStepMatcherFactory {
 		}
 
 	}
-
+	
 }
